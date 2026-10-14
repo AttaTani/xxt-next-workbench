@@ -5,6 +5,7 @@
 
 const runM1 = require('./cases/XXT_TEST_多账户会话物理隔离测试_v1.0.0');
 const runM2 = require('./cases/XXT_TEST_任务调度与未登录挂起测试_v1.0.0');
+const runS1 = require('./cases/XXT_TEST_切片S1_自愈沙箱五道门禁全量回归_v1.0.0');
 
 async function main() {
     console.log('===========================================================');
@@ -30,6 +31,15 @@ async function main() {
         results.push({ name: 'CASE 02: 任务生命周期与未登录任务拦截挂起', pass: true, duration: Date.now() - t0 });
     } catch (err) {
         results.push({ name: 'CASE 02: 任务生命周期与未登录任务拦截挂起', pass: false, error: err.message });
+    }
+
+    // Case 3: 自治沙箱热修复与五道防爆门禁 (切片 S1)
+    try {
+        const t0 = Date.now();
+        await runS1();
+        results.push({ name: 'CASE 03: 代码级自主沙箱热修复与五道防爆安全门禁 (Slice S1)', pass: true, duration: Date.now() - t0 });
+    } catch (err) {
+        results.push({ name: 'CASE 03: 代码级自主沙箱热修复与五道防爆安全门禁 (Slice S1)', pass: false, error: err.message });
     }
 
     const totalDuration = ((Date.now() - startTime) / 1000).toFixed(2);

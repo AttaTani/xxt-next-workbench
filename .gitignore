@@ -30,5 +30,9 @@ Thumbs.db
 .vscode/
 .idea/
 
+# Hotfix Sandbox
+.sandbox/
+.sandbox/**
+
 # Root temporary diagnostic screenshots (must be saved into 05_测试与验收_QA/screenshots/)
 /*.png

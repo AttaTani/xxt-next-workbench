@@ -1,4 +1,5 @@
 const EventEmitter = require('events');
+const { RuleManager, IncidentDumper, AiRepairExpert, Gatekeeper } = require('./selfHeal');
 
 /**
  * ExamSolver: 超星整页独立章节测验与作业提取及作答引擎
@@ -7,6 +8,10 @@ class ExamSolver extends EventEmitter {
     constructor(config) {
         super();
         this.config = config || {};
+        this.ruleManager = new RuleManager();
+        this.gatekeeper = new Gatekeeper();
+        this.incidentDumper = new IncidentDumper();
+        this.aiRepairExpert = new AiRepairExpert(this.config, this.ruleManager, this.gatekeeper);
     }
 
     /**
@@ -18,105 +23,37 @@ class ExamSolver extends EventEmitter {
         if (!page || page.isClosed()) return { found: false, questions: [] };
 
         const allFrames = [page, ...page.frames()];
+        const selectors = this.ruleManager.getModuleSelectors('exam') || {};
 
         for (const frame of allFrames) {
             try {
-                const examData = await frame.evaluate(() => {
-                    // 超星章节测验与作业核心容器探测
-                    const examContainer = document.querySelector('.TiMu, .Zy_TItle, #submitForm, .questionList, .singleQuesId, .Cy_TItle, .marBom60, .Zy_ulTop');
-                    if (!examContainer) return null;
+                let examData = await this._evaluateFrameExam(frame, selectors);
 
-                    // 提取所有独立整题容器 (过滤父子嵌套)
-                    let questionNodes = Array.from(document.querySelectorAll('.TiMu, .singleQuesId, .marBom60'));
-                    if (questionNodes.length === 0) {
-                        questionNodes = Array.from(document.querySelectorAll('[id^="question_"], .question_item, .stem_holder'));
-                    }
-                    if (questionNodes.length === 0) {
-                        questionNodes = Array.from(document.querySelectorAll('.Zy_TItle'));
-                    }
-                    questionNodes = questionNodes.filter(node => !questionNodes.some(other => other !== node && other.contains(node)));
-                    if (questionNodes.length === 0) return null;
+                // 自进化热修复 Hook: 若当前 frame 明确属于作业/测验页面但未能提取到试题
+                const frameUrl = frame.url ? frame.url() : '';
+                const isExamFrameLikely = /work|homework|exam|doHomeWork|studentstudy/i.test(frameUrl);
 
-                    const parsedQuestions = [];
-
-                    questionNodes.forEach((qNode, idx) => {
-                        // 1. 题型判断
-                        let qType = '单选题';
-                        const typeEl = qNode.querySelector('.Zy_TItle_type, .type, .TiMu_type, em');
-                        const rawType = (typeEl ? typeEl.innerText : qNode.innerText) || '';
-                        if (rawType.includes('多选')) qType = '多选题';
-                        else if (rawType.includes('判断')) qType = '判断题';
-                        else if (rawType.includes('填空')) qType = '填空题';
-
-                        // 2. 题干文本提取与清洗
-                        const stemEl = qNode.querySelector('.Zy_TItle_name, .Zy_TItle, .fontx, h3, .stem') || qNode;
-                        let stem = (stemEl.innerText || '').trim();
-                        // 过滤题干开头的题号与题型标签如: 1. 【单选题】
-                        stem = stem.replace(/^\d+[\.、\s]*/, '')
-                                   .replace(/^【(单选题|多选题|判断题|填空题)】/, '')
-                                   .replace(/\([^\)]*分\)/g, '')
-                                   .trim();
-
-                        // 3. 选项列表与选择器定位
-                        const options = [];
-                        const optElements = Array.from(qNode.querySelectorAll('li, .Zy_ulTop li, .answerBg, label, .ans-options-list li'));
-
-                        optElements.forEach((optEl, optIdx) => {
-                            const optText = (optEl.innerText || '').trim();
-                            if (!optText) return;
-
-                            // 提取选项字母 A, B, C, D
-                            const letterMatch = optText.match(/^([A-Z])[\.、\:\s]/i);
-                            const letter = letterMatch ? letterMatch[1].toUpperCase() : String.fromCharCode(65 + optIdx);
-                            const cleanContent = optText.replace(/^[A-Z][\.、\:\s]+/i, '').trim();
-
-                            // 关联的 input radio/checkbox 或可点击容器
-                            const inputEl = optEl.querySelector('input[type="radio"], input[type="checkbox"]');
-                            const inputId = inputEl ? inputEl.id : '';
-                            const inputName = inputEl ? inputEl.name : '';
-                            const inputValue = inputEl ? inputEl.value : '';
-
-                            options.push({
-                                letter,
-                                rawText: optText,
-                                content: cleanContent,
-                                inputId,
-                                inputName,
-                                inputValue,
-                                optionIndex: optIdx
-                            });
+                if ((!examData || examData.questionCount === 0) && isExamFrameLikely) {
+                    if (this.config.enableSelfHealing !== false) {
+                        console.log(`[ExamSolver] ⚠️ 测验 iframe (${frameUrl}) 提取题目为 0，触发现场快照与自进化诊断...`);
+                        const dump = await this.incidentDumper.dumpIncident({
+                            page,
+                            frame,
+                            taskId: 'live_exam',
+                            taskName: '独立章节测验',
+                            scene: 'CHAPTER_EXAM',
+                            error: 'ZeroQuestionsExtracted: Likely DOM selector mutation.',
+                            currentSelectors: selectors
                         });
 
-                        // 仅收录含有有效题干和选项的选择/判断题
-                        if (stem && options.length > 0) {
-                            parsedQuestions.push({
-                                questionIndex: idx,
-                                id: `ques_${idx + 1}`,
-                                type: qType,
-                                stem,
-                                options
-                            });
+                        const healRes = await this.aiRepairExpert.diagnoseAndRepair(dump.incidentData);
+                        if (healRes.success) {
+                            console.log(`[ExamSolver] 🚀 自愈规则热重载完成 (v${healRes.version})，立即重试提取...`);
+                            const updatedSelectors = this.ruleManager.getModuleSelectors('exam');
+                            examData = await this._evaluateFrameExam(frame, updatedSelectors);
                         }
-                    });
-
-                    if (parsedQuestions.length === 0) return null;
-
-                    // 检查页面底部提交与保存按钮 (兼容超星做作业页面 btnBlueSubmit 与 noSubmit)
-                    const hasSubmitBtn = !!document.querySelector('.Btn_blue_1, a[onclick*="btnBlueSubmit"], .btnSubmit, #btnSubmit, a.btn-ok, a[onclick*="formSubmit"], input[type="submit"], .submitBtn, a.btn_ok, #formSubmit, [onclick*="submit" i], .workBtnIndex');
-                    const hasSaveBtn = !!document.querySelector('.btnGray_1, a[onclick*="noSubmit"], .btnSave, #btnSave, a.btn-save, a[onclick*="saveForm"], [onclick*="save" i]');
-                    const bodyText = document.body ? document.body.innerText : '';
-                    const isCompleted = (!hasSubmitBtn && !hasSaveBtn) && 
-                        (bodyText.includes('已完成') || bodyText.includes('已提交') || bodyText.includes('已批阅') || bodyText.includes('您的得分') || bodyText.includes('成绩'));
-
-                    return {
-                        title: (document.title || '章节测验').trim(),
-                        questionCount: parsedQuestions.length,
-                        questions: parsedQuestions,
-                        hasSubmitBtn,
-                        hasSaveBtn,
-                        isCompleted
-                    };
-                });
+                    }
+                }
 
                 if (examData && examData.questionCount > 0) {
                     return {
@@ -129,6 +66,109 @@ class ExamSolver extends EventEmitter {
         }
 
         return { found: false, questions: [] };
+    }
+
+    /**
+     * 在指定 frame 内部执行基于动态选择器的题目 DOM 提取
+     * @private
+     */
+    async _evaluateFrameExam(frame, selectors) {
+        return await frame.evaluate((sel) => {
+            const containerSel = sel.container || '.TiMu, .Zy_TItle, #submitForm, .questionList, .singleQuesId, .Cy_TItle, .marBom60, .Zy_ulTop';
+            const qNodeSel = sel.questionNodes || '.TiMu, .singleQuesId, .marBom60, [id^="question_"], .question_item, .stem_holder, .Zy_TItle';
+            const typeSel = sel.type || '.Zy_TItle_type, .type, .TiMu_type, em';
+            const stemSel = sel.stem || '.Zy_TItle_name, .Zy_TItle, .fontx, h3, .stem';
+            const optSel = sel.options || 'li, .Zy_ulTop li, .answerBg, label, .ans-options-list li';
+
+            // 超星章节测验与作业核心容器探测
+            const examContainer = document.querySelector(containerSel);
+            if (!examContainer) return null;
+
+            // 提取所有独立整题容器 (过滤父子嵌套)
+            let questionNodes = Array.from(document.querySelectorAll(qNodeSel));
+            questionNodes = questionNodes.filter(node => !questionNodes.some(other => other !== node && other.contains(node)));
+            if (questionNodes.length === 0) return null;
+
+            const parsedQuestions = [];
+
+            questionNodes.forEach((qNode, idx) => {
+                // 1. 题型判断
+                let qType = '单选题';
+                const typeEl = qNode.querySelector(typeSel);
+                const rawType = (typeEl ? typeEl.innerText : qNode.innerText) || '';
+                if (rawType.includes('多选')) qType = '多选题';
+                else if (rawType.includes('判断')) qType = '判断题';
+                else if (rawType.includes('填空')) qType = '填空题';
+
+                // 2. 题干文本提取与清洗
+                const stemEl = qNode.querySelector(stemSel) || qNode;
+                let stem = (stemEl.innerText || '').trim();
+                // 过滤题干开头的题号与题型标签如: 1. 【单选题】
+                stem = stem.replace(/^\d+[\.、\s]*/, '')
+                           .replace(/^【(单选题|多选题|判断题|填空题)】/, '')
+                           .replace(/\([^\)]*分\)/g, '')
+                           .trim();
+
+                // 3. 选项列表与选择器定位
+                const options = [];
+                const optElements = Array.from(qNode.querySelectorAll(optSel));
+
+                optElements.forEach((optEl, optIdx) => {
+                    const optText = (optEl.innerText || '').trim();
+                    if (!optText) return;
+
+                    // 提取选项字母 A, B, C, D
+                    const letterMatch = optText.match(/^([A-Z])[\.、\:\s]/i);
+                    const letter = letterMatch ? letterMatch[1].toUpperCase() : String.fromCharCode(65 + optIdx);
+                    const cleanContent = optText.replace(/^[A-Z][\.、\:\s]+/i, '').trim();
+
+                    // 关联的 input radio/checkbox 或可点击容器
+                    const inputEl = optEl.querySelector('input[type="radio"], input[type="checkbox"]');
+                    const inputId = inputEl ? inputEl.id : '';
+                    const inputName = inputEl ? inputEl.name : '';
+                    const inputValue = inputEl ? inputEl.value : '';
+
+                    options.push({
+                        letter,
+                        rawText: optText,
+                        content: cleanContent,
+                        inputId,
+                        inputName,
+                        inputValue,
+                        optionIndex: optIdx
+                    });
+                });
+
+                // 仅收录含有有效题干和选项的选择/判断题
+                if (stem && options.length > 0) {
+                    parsedQuestions.push({
+                        questionIndex: idx,
+                        id: `ques_${idx + 1}`,
+                        type: qType,
+                        stem,
+                        options
+                    });
+                }
+            });
+
+            if (parsedQuestions.length === 0) return null;
+
+            // 检查页面底部提交与保存按钮
+            const hasSubmitBtn = !!document.querySelector('.Btn_blue_1, a[onclick*="btnBlueSubmit"], .btnSubmit, #btnSubmit, a.btn-ok, a[onclick*="formSubmit"], input[type="submit"], .submitBtn, a.btn_ok, #formSubmit, [onclick*="submit" i], .workBtnIndex');
+            const hasSaveBtn = !!document.querySelector('.btnGray_1, a[onclick*="noSubmit"], .btnSave, #btnSave, a.btn-save, a[onclick*="saveForm"], [onclick*="save" i]');
+            const bodyText = document.body ? document.body.innerText : '';
+            const isCompleted = (!hasSubmitBtn && !hasSaveBtn) && 
+                (bodyText.includes('已完成') || bodyText.includes('已提交') || bodyText.includes('已批阅') || bodyText.includes('您的得分') || bodyText.includes('成绩'));
+
+            return {
+                title: (document.title || '章节测验').trim(),
+                questionCount: parsedQuestions.length,
+                questions: parsedQuestions,
+                hasSubmitBtn,
+                hasSaveBtn,
+                isCompleted
+            };
+        }, selectors);
     }
 
     /**

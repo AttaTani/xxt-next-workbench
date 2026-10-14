@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "version": "1.0.0",
+  "description": "超星自动化作业、测验与播放器统一选择器规则库",
+  "exam": {
+    "container": ".TiMu, .Zy_TItle, #submitForm, .questionList, .singleQuesId, .Cy_TItle, .marBom60, .Zy_ulTop",
+    "questionNodes": ".TiMu, .singleQuesId, .marBom60, [id^=\"question_\"], .question_item, .stem_holder, .Zy_TItle",
+    "type": ".Zy_TItle_type, .type, .TiMu_type, em",
+    "stem": ".Zy_TItle_name, .Zy_TItle, .fontx, h3, .stem",
+    "options": "li, .Zy_ulTop li, .answerBg, label, .ans-options-list li",
+    "inputs": "input[type=\"radio\"], input[type=\"checkbox\"]",
+    "submitButtons": "a.Btn_blue_1.workBtnIndex, a[onclick*=\"btnBlueSubmit\"], .btnBlueSubmit, #btnSubmit, a.Btn_blue_1",
+    "saveButtons": "a.btnGray_1.workBtnIndex, a[onclick*=\"noSubmit\"], .noSubmit, a.btnGray_1",
+    "confirmButtons": "a.bluebtn, a[onclick*=\"submitCheckTimes\"], .submitCheckTimes, .pop_confirm a.bluebtn",
+    "completedMarkers": ".Py_mian0, .score, .totalScore, .Py_tk, .mark_score"
+  },
+  "quiz": {
+    "modal": ".ans-job-icon, .ans-dialog, .ans-dialog-content, .ans-videoquiz",
+    "options": ".ans-videoquiz-opt input, .ans-videoquiz-title, .ans-videoquiz-opt label",
+    "submitButton": "#ext-gen1045, .ans-videoquiz-submit, [class*=\"videoquiz-submit\"]"
+  },
+  "catalog": {
+    "container": "#posCatalog, .posCatalog, .catalog_list",
+    "activeItem": ".posCatalog_select.active, .catalog_tabel .cur",
+    "allUnits": "li, .posCatalog_select, .catalog_tabel li"
+  }
+}
