@@ -3,7 +3,7 @@
 > **大模型驱动 · 自愈沙箱热修 · 多租户并发 · 全景 Web 学习托管工作台**  
 > *An autonomous, self-healing headless learning engine powered by LLMs & Playwright.*
 
-[![License: ISC](https://img.shields.io/badge/License-ISC-blue.svg)](https://opensource.org/licenses/ISC)
+[![License: WTFPL](https://img.shields.io/badge/License-WTFPL-brightgreen.svg)](http://www.wtfpl.net/about/)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D18.0.0-green.svg)](https://nodejs.org/)
 [![Playwright](https://img.shields.io/badge/Playwright-1.40%2B-red.svg)](https://playwright.dev/)
 [![Status](https://img.shields.io/badge/Status-Production%20Ready-brightgreen.svg)](#)
@@ -150,4 +150,4 @@ npm test
 
 ## 📄 开源许可证
 
-本项目基于 [ISC License](LICENSE) 开源发布。
+本项目基于 [WTFPL (Do What The Fuck You Want To Public License)](LICENSE) 开源发布。你想怎么干就怎么干，零限制、零拘束。
