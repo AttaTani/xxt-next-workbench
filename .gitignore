@@ -12,12 +12,21 @@ qrcode.png
 *.png
 .env
 .env.*
+!.env.example
+!**/.env.example
 config.json
 **/config.json
+!config.example.json
+!**/config.example.json
 Remote
 api keys*.txt
 *.pem
 *.key
+
+# Test & Automation Output
+test-results/
+playwright-report/
+.cache/
 
 # Runtime Logs
 *.log
