@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>方案 B：极简密态极光终端 (Dense Terminal Studio) · 视觉原型</title>
+    <style>
+        :root {
+            --term-bg: #07080a;
+            --term-surface: #0e1117;
+            --term-border: #1e2430;
+            --term-border-focus: #3b4559;
+            --term-accent: #00f59b;
+            --term-cyan: #38bdf8;
+            --term-amber: #f59e0b;
+            --term-rose: #f43f5e;
+            --term-text-main: #f1f5f9;
+            --term-text-muted: #64748b;
+            --font-mono: "JetBrains Mono", Consolas, "Courier New", monospace;
+            --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", sans-serif;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: var(--term-bg);
+            color: var(--term-text-main);
+            font-family: var(--font-sans);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 顶部方案切换导航条 */
+        .demo-nav-bar {
+            background: #040507;
+            border-bottom: 1px solid var(--term-border);
+            padding: 8px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            flex-shrink: 0;
+        }
+        .demo-nav-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 700;
+            color: #94a3b8;
+        }
+        .demo-nav-title span {
+            color: var(--term-accent);
+            background: rgba(0, 245, 155, 0.08);
+            padding: 2px 8px;
+            border-radius: 3px;
+            border: 1px solid rgba(0, 245, 155, 0.25);
+            font-family: var(--font-mono);
+        }
+        .demo-nav-links { display: flex; gap: 8px; }
+        .demo-nav-btn {
+            padding: 5px 12px;
+            border-radius: 4px;
+            text-decoration: none;
+            color: #94a3b8;
+            background: #11151e;
+            border: 1px solid var(--term-border);
+            font-weight: 600;
+            font-size: 0.76rem;
+            transition: all 0.15s;
+        }
+        .demo-nav-btn:hover { color: #fff; border-color: #64748b; }
+        .demo-nav-btn.active {
+            color: #040507;
+            background: var(--term-accent);
+            border-color: var(--term-accent);
+            box-shadow: 0 0 10px rgba(0, 245, 155, 0.4);
+        }
+
+        /* 终端专业状态顶栏 (Bloomberg Style Terminal Bar) */
+        .term-header {
+            background: #0a0d13;
+            border-bottom: 1px solid var(--term-border);
+            padding: 6px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            flex-shrink: 0;
+        }
+        .term-meta-group {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        .term-meta-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--term-text-muted);
+        }
+        .term-meta-item b {
+            color: var(--term-text-main);
+            font-weight: 600;
+        }
+        .dot-pulse {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--term-accent);
+            box-shadow: 0 0 6px var(--term-accent);
+        }
+
+        /* 终端核心布局：无缝面板分割 (Seamless Split Panels, 0 Padding Wastage) */
+        .term-workspace {
+            display: grid;
+            grid-template-columns: 280px 1fr 380px;
+            flex: 1;
+            overflow: hidden;
+            background: var(--term-border);
+            gap: 1px; /* 1px 细线边框分隔 */
+        }
+
+        .term-panel {
+            background: var(--term-surface);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .panel-head {
+            background: #0b0e14;
+            border-bottom: 1px solid var(--term-border);
+            padding: 8px 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-family: var(--font-mono);
+            font-size: 0.73rem;
+            font-weight: 700;
+            color: #94a3b8;
+            letter-spacing: 0.04em;
+        }
+        .panel-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        /* 账号密态列表 */
+        .dense-account-row {
+            background: #080a0f;
+            border: 1px solid var(--term-border);
+            border-radius: 4px;
+            padding: 8px 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            transition: all 0.1s;
+            cursor: pointer;
+        }
+        .dense-account-row:hover {
+            border-color: var(--term-border-focus);
+            background: #111622;
+        }
+        .dense-account-row.active {
+            border-color: var(--term-accent);
+            background: rgba(0, 245, 155, 0.03);
+        }
+        .dense-acc-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .dense-acc-name {
+            font-weight: 600;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .dense-acc-sub {
+            font-size: 0.7rem;
+            color: var(--term-text-muted);
+            font-family: var(--font-mono);
+        }
+
+        /* 任务密集表格流 (High-Density Data Grid) */
+        .dense-task-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8rem;
+            font-family: var(--font-mono);
+        }
+        .dense-task-table th {
+            text-align: left;
+            padding: 8px 10px;
+            color: var(--term-text-muted);
+            font-weight: 600;
+            font-size: 0.72rem;
+            border-bottom: 1px solid var(--term-border);
+            background: #090c12;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        .dense-task-table td {
+            padding: 10px;
+            border-bottom: 1px solid #141822;
+            vertical-align: middle;
+        }
+        .dense-task-table tr:hover td {
+            background: #121724;
+        }
+        .task-course-title {
+            font-family: var(--font-sans);
+            font-weight: 600;
+            color: #f8fafc;
+            font-size: 0.84rem;
+        }
+        .task-course-chapter {
+            font-size: 0.72rem;
+            color: #64748b;
+            margin-top: 2px;
+        }
+        .dense-bar-wrap {
+            width: 120px;
+            height: 6px;
+            background: #161b26;
+            border-radius: 2px;
+            overflow: hidden;
+            display: inline-block;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+        .dense-bar-fill {
+            height: 100%;
+            background: var(--term-accent);
+        }
+
+        /* 紧凑 CRT 视口 */
+        .dense-crt-box {
+            height: 220px;
+            background: #020304;
+            border: 1px solid var(--term-border);
+            border-radius: 4px;
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 10px;
+            flex-shrink: 0;
+        }
+        .dense-crt-box::after {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(rgba(18, 25, 40, 0) 50%, rgba(0, 0, 0, 0.4) 50%);
+            background-size: 100% 3px;
+            pointer-events: none;
+            opacity: 0.7;
+        }
+        .dense-crt-hud {
+            position: absolute;
+            top: 6px; left: 8px; right: 8px;
+            display: flex;
+            justify-content: space-between;
+            font-family: var(--font-mono);
+            font-size: 0.68rem;
+            color: var(--term-accent);
+            z-index: 5;
+        }
+
+        /* 毫秒级终端控制台 */
+        .dense-log-stream {
+            flex: 1;
+            background: #040507;
+            border: 1px solid var(--term-border);
+            border-radius: 4px;
+            padding: 8px;
+            font-family: var(--font-mono);
+            font-size: 0.72rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .log-l { display: flex; gap: 8px; line-height: 1.35; }
+        .log-ts { color: #475569; }
+        .log-cyan { color: var(--term-cyan); font-weight: 600; }
+        .log-acc { color: var(--term-accent); font-weight: 600; }
+        .log-txt { color: #cbd5e1; }
+
+        /* 极简底部快捷栏 (Keybinding Footer) */
+        .term-footer {
+            background: #040507;
+            border-top: 1px solid var(--term-border);
+            padding: 6px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-family: var(--font-mono);
+            font-size: 0.72rem;
+            color: var(--term-text-muted);
+            flex-shrink: 0;
+        }
+        .kbd-key {
+            background: #1e2430;
+            color: #cbd5e1;
+            padding: 1px 5px;
+            border-radius: 2px;
+            border: 1px solid #334155;
+            margin-right: 4px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 顶部方案切换条 -->
+    <div class="demo-nav-bar">
+        <div class="demo-nav-title">
+            <span>SCHEME EVALUATION</span>
+            工作台美学探索 · 纯前端高保真原型
+        </div>
+        <div class="demo-nav-links">
+            <a href="demo-a-rackmount.html" class="demo-nav-btn">🎛️ 方案 A: 机架式工控仪表台</a>
+            <a href="demo-b-terminal.html" class="demo-nav-btn active">💻 方案 B: 极简密态极光终端</a>
+            <a href="demo-c-broadcast.html" class="demo-nav-btn">🎥 方案 C: 现场导播导控台</a>
+            <a href="index.html" class="demo-nav-btn">🔙 返回生产工作台</a>
+        </div>
+    </div>
+
+    <!-- 彭博风格状态顶栏 -->
+    <div class="term-header">
+        <div class="term-meta-group">
+            <div class="term-meta-item">
+                <div class="dot-pulse"></div>
+                <b>XXT.TERMINAL v2.4</b>
+            </div>
+            <div class="term-meta-item">
+                GATEWAY: <b>114.220.89.14 (RESIDENTIAL)</b>
+            </div>
+            <div class="term-meta-item">
+                LOAD: <b>2 WORKERS / 2 THREADS</b>
+            </div>
+            <div class="term-meta-item">
+                THROUGHPUT: <b>1.5x DUAL_SPEED</b>
+            </div>
+        </div>
+        <div style="display:flex; gap:10px;">
+            <button style="background:var(--term-accent); color:#000; border:none; padding:3px 10px; border-radius:3px; font-weight:700; font-family:var(--font-mono); font-size:0.75rem; cursor:pointer;" onclick="alert('【方案B原型交互】触发高频全并发挂机')">
+                ▶ RUN ALL [F5]
+            </button>
+            <button style="background:#1e2430; color:#fff; border:1px solid #334155; padding:3px 10px; border-radius:3px; font-family:var(--font-mono); font-size:0.75rem; cursor:pointer;">
+                PAUSE [SPACE]
+            </button>
+        </div>
+    </div>
+
+    <!-- 终端核心三栏工作区 -->
+    <div class="term-workspace">
+
+        <!-- 左栏：多租户账号管理 -->
+        <div class="term-panel">
+            <div class="panel-head">
+                <span>// ACCOUNTS (2 ACTIVE)</span>
+                <span style="color:var(--term-accent)">+ ADD [N]</span>
+            </div>
+            <div class="panel-content">
+                <div class="dense-account-row active">
+                    <div class="dense-acc-info">
+                        <div class="dense-acc-name">
+                            <span style="color:var(--term-accent)">●</span> 张同学
+                        </div>
+                        <div class="dense-acc-sub">ID: 2024010892 · 1 RUNNING</div>
+                    </div>
+                    <span style="font-family:var(--font-mono); font-size:0.7rem; color:var(--term-accent)">78%</span>
+                </div>
+
+                <div class="dense-account-row">
+                    <div class="dense-acc-info">
+                        <div class="dense-acc-name">
+                            <span style="color:var(--term-amber)">●</span> 李同学
+                        </div>
+                        <div class="dense-acc-sub">ID: 2024010893 · STANDBY</div>
+                    </div>
+                    <span style="font-family:var(--font-mono); font-size:0.7rem; color:var(--term-text-muted)">IDLE</span>
+                </div>
+
+                <div style="margin-top:auto; background:#07090d; border:1px dashed var(--term-border); padding:10px; border-radius:4px; text-align:center; font-size:0.74rem; color:var(--term-text-muted);">
+                    支持 Cookie / 扫码热插拔切换
+                </div>
+            </div>
+        </div>
+
+        <!-- 中栏：高信息密度任务调度表 -->
+        <div class="term-panel">
+            <div class="panel-head">
+                <span>// TASK QUEUE PIPELINE (HIGH DENSITY)</span>
+                <span>SORT: PRIORITY</span>
+            </div>
+            <div style="flex:1; overflow-y:auto;">
+                <table class="dense-task-table">
+                    <thead>
+                        <tr>
+                            <th style="width:40px;">STAT</th>
+                            <th>COURSE & CHAPTER</th>
+                            <th style="width:180px;">PROGRESS</th>
+                            <th style="width:100px;">SPEED</th>
+                            <th style="width:110px;">ELAPSED</th>
+                            <th style="width:70px;">ACTIONS</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span style="color:var(--term-accent)">RUN</span></td>
+                            <td>
+                                <div class="task-course-title">毛泽东思想和中国特色社会主义理论体系概论</div>
+                                <div class="task-course-chapter">第4章 建设中国特色社会主义总依据 · 视频任务点</div>
+                            </td>
+                            <td>
+                                <div class="dense-bar-wrap"><div class="dense-bar-fill" style="width:78.4%"></div></div>
+                                <span>78.4%</span>
+                            </td>
+                            <td><span style="color:var(--term-cyan)">1.5x</span></td>
+                            <td>00:14:28</td>
+                            <td><button style="background:transparent; border:1px solid #334155; color:#94a3b8; padding:2px 6px; border-radius:2px; font-size:0.7rem; cursor:pointer;">PAUSE</button></td>
+                        </tr>
+                        <tr>
+                            <td><span style="color:var(--term-amber)">WAIT</span></td>
+                            <td>
+                                <div class="task-course-title">大学英语(三) · 综合教程</div>
+                                <div class="task-course-chapter">Unit 3 Passage B · AI 答题就绪 (待命队列)</div>
+                            </td>
+                            <td>
+                                <div class="dense-bar-wrap"><div class="dense-bar-fill" style="width:35%; background:var(--term-amber)"></div></div>
+                                <span>35.0%</span>
+                            </td>
+                            <td><span>1.0x</span></td>
+                            <td>--:--:--</td>
+                            <td><button style="background:transparent; border:1px solid #334155; color:#94a3b8; padding:2px 6px; border-radius:2px; font-size:0.7rem; cursor:pointer;">START</button></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 极简录入流 -->
+            <div style="padding:8px 12px; background:#080b10; border-top:1px solid var(--term-border); display:flex; gap:8px;">
+                <input type="text" placeholder="CMD: input course URL and press Enter..." style="flex:1; background:#0e121a; border:1px solid var(--term-border); color:#fff; font-family:var(--font-mono); font-size:0.78rem; padding:6px 10px; border-radius:3px; outline:none;">
+                <button style="background:#1e2430; border:1px solid #334155; color:var(--term-accent); font-family:var(--font-mono); font-size:0.78rem; padding:0 12px; border-radius:3px; cursor:pointer;">ENQUEUE</button>
+            </div>
+        </div>
+
+        <!-- 右栏：精密 CRT 监视窗 + 结构化毫秒终端 -->
+        <div class="term-panel">
+            <div class="panel-head">
+                <span>// MONITOR & EVENT LOG</span>
+                <span style="color:var(--term-cyan)">FPS: 30</span>
+            </div>
+            <div class="panel-content" style="gap:8px;">
+                <!-- 紧凑 CRT 视窗 -->
+                <div class="dense-crt-box">
+                    <div class="dense-crt-hud">
+                        <span>LIVE OPTICAL PROBE</span>
+                        <span>RES: 1920x1080</span>
+                    </div>
+                    <svg viewBox="0 0 380 220" style="width:100%; height:100%; background:#06080d;">
+                        <rect x="15" y="15" width="350" height="20" fill="#131722" rx="2"/>
+                        <text x="25" y="29" fill="#00f59b" font-size="10" font-family="monospace">ACTIVE: chao-xing-study-engine-vps</text>
+                        <rect x="15" y="45" width="230" height="130" fill="#0c0f17" stroke="#1f2637"/>
+                        <circle cx="130" cy="110" r="18" fill="#00f59b" opacity="0.8"/>
+                        <polygon points="126,102 138,110 126,118" fill="#000"/>
+                        <rect x="255" y="45" width="110" height="12" fill="#1e2536"/>
+                        <rect x="255" y="65" width="90" height="8" fill="#1e2536"/>
+                        <rect x="255" y="80" width="100" height="8" fill="#1e2536"/>
+                        <rect x="255" y="105" width="110" height="24" fill="#0f291e" rx="2"/>
+                        <text x="265" y="121" fill="#00f59b" font-size="9" font-family="monospace">PASS: 100%</text>
+                    </svg>
+                </div>
+
+                <!-- 毫秒级终端 -->
+                <div class="dense-log-stream">
+                    <div class="log-l"><span class="log-ts">03:22:15.102</span> <span class="log-acc">[SYS]</span> <span class="log-txt">Worker 1 locked slot BAY-01</span></div>
+                    <div class="log-l"><span class="log-ts">03:22:18.441</span> <span class="log-cyan">[AI]</span> <span class="log-txt">Querying LLM: "中国特色社会主义..."</span></div>
+                    <div class="log-l"><span class="log-ts">03:22:19.102</span> <span class="log-cyan">[AI]</span> <span class="log-txt">Match found -> Option B selected</span></div>
+                    <div class="log-l"><span class="log-ts">03:22:25.801</span> <span class="log-acc">[VID]</span> <span class="log-txt">Playback checkpoint 78.4% confirmed</span></div>
+                    <div class="log-l"><span class="log-ts">03:22:40.012</span> <span class="log-ts">[NET]</span> <span class="log-txt">Heartbeat pong: 28ms jitter 2ms</span></div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- 底部键盘快捷键栏 -->
+    <div class="term-footer">
+        <div>
+            <span class="kbd-key">SPACE</span> 暂停/继续
+            <span class="kbd-key">N</span> 新建任务
+            <span class="kbd-key">Z</span> 放大监视器
+            <span class="kbd-key">TAB</span> 切换租户
+        </div>
+        <div>
+            DENSE TERMINAL VIEW · ZERO-LATENCY ENGINE
+        </div>
+    </div>
+
+</body>
+</html>

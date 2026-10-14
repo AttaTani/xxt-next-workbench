@@ -1,0 +1,31 @@
+{
+  "name": "xxt-automation-service",
+  "version": "1.0.0",
+  "description": "学习通高可用无头自动化学习与挂机服务 (XXT Automation Engine)",
+  "main": "vps-service/web.js",
+  "scripts": {
+    "start": "node vps-service/web.js",
+    "start:debug": "06_部署与运维_Ops\\windows\\start_debug.bat",
+    "start:silent": "wscript 06_部署与运维_Ops\\windows\\start_silent.vbs",
+    "stop": "06_部署与运维_Ops\\windows\\stop_service.bat",
+    "setup:shortcuts": "node 06_部署与运维_Ops/windows/create_shortcuts.js",
+    "start:source": "node 01_源码工程_Source/web.js",
+    "test": "node 05_测试与验收_QA/run_all_tests.js"
+  },
+  "keywords": [
+    "xuexitong",
+    "playwright",
+    "automation",
+    "headless",
+    "bot"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^18.0.7",
+    "express": "^5.3.0",
+    "playwright": "^1.64.0",
+    "qrcode": "^1.5.4",
+    "qrcode-terminal": "^0.12.0"
+  }
+}

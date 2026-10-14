@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>方案 A：机架式工控仪表台 (Hardware Rackmount) · 视觉原型</title>
+    <style>
+        :root {
+            --rack-bg: #0b0d11;
+            --rack-chassis: #13171f;
+            --rack-panel: #1a202c;
+            --rack-panel-border: #2d3748;
+            --rack-recess: #07090c;
+            --rack-bezel: #242b38;
+            --rack-led-green: #10b981;
+            --rack-led-amber: #f59e0b;
+            --rack-led-red: #ef4444;
+            --rack-text-main: #e2e8f0;
+            --rack-text-dim: #718096;
+            --font-mono: "JetBrains Mono", Consolas, "Courier New", monospace;
+            --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", sans-serif;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: var(--rack-bg);
+            background-image: 
+                radial-gradient(circle at 50% 0%, rgba(30, 41, 59, 0.4) 0%, transparent 70%),
+                linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+            background-size: 100% 100%, 24px 24px, 24px 24px;
+            color: var(--rack-text-main);
+            font-family: var(--font-ui);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding-bottom: 40px;
+        }
+
+        /* 顶部方案切换导航条 */
+        .demo-nav-bar {
+            background: #080a0e;
+            border-bottom: 2px solid #2d3748;
+            padding: 8px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.82rem;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.6);
+        }
+        .demo-nav-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            color: #94a3b8;
+        }
+        .demo-nav-title span {
+            color: #38bdf8;
+            background: rgba(56, 189, 248, 0.1);
+            padding: 2px 8px;
+            border-radius: 3px;
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            font-family: var(--font-mono);
+        }
+        .demo-nav-links {
+            display: flex;
+            gap: 8px;
+        }
+        .demo-nav-btn {
+            padding: 6px 14px;
+            border-radius: 4px;
+            text-decoration: none;
+            color: #94a3b8;
+            background: #131720;
+            border: 1px solid #2d3748;
+            font-weight: 600;
+            font-size: 0.78rem;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .demo-nav-btn:hover {
+            color: #ffffff;
+            border-color: #64748b;
+            background: #1e2433;
+        }
+        .demo-nav-btn.active {
+            color: #070a0e;
+            background: #38bdf8;
+            border-color: #38bdf8;
+            box-shadow: 0 0 12px rgba(56, 189, 248, 0.5);
+        }
+
+        /* 机柜主容器 (19-inch Rack Cabinet) */
+        .rack-cabinet {
+            max-width: 1440px;
+            margin: 24px auto 0;
+            width: calc(100% - 32px);
+            background: var(--rack-chassis);
+            border: 3px solid #2d3748;
+            border-radius: 8px;
+            box-shadow: 
+                0 20px 50px rgba(0, 0, 0, 0.8),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1),
+                inset 0 0 0 1px #1a202c;
+            position: relative;
+            padding: 20px 24px;
+        }
+
+        /* 机柜左右导轨螺丝装饰条 */
+        .rack-cabinet::before, .rack-cabinet::after {
+            content: "";
+            position: absolute;
+            top: 12px;
+            bottom: 12px;
+            width: 8px;
+            background: repeating-linear-gradient(
+                to bottom,
+                #475569 0px,
+                #475569 8px,
+                #1e293b 8px,
+                #1e293b 24px
+            );
+            border-radius: 2px;
+            box-shadow: inset 0 1px 2px rgba(0,0,0,0.8);
+        }
+        .rack-cabinet::before { left: 8px; }
+        .rack-cabinet::after { right: 8px; }
+
+        .rack-inner {
+            margin: 0 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+
+        /* 顶部主机架控制面板 (Rack Header Unit) */
+        .rack-header-unit {
+            background: linear-gradient(180deg, #1f2735 0%, #171d27 100%);
+            border: 1px solid #334155;
+            border-top: 1px solid #475569;
+            border-radius: 6px;
+            padding: 14px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 
+                0 4px 10px rgba(0,0,0,0.5),
+                inset 0 1px 0 rgba(255,255,255,0.08);
+            position: relative;
+        }
+        .rack-title-group {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .screw-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #475569, #1e293b);
+            border: 1px solid #0f172a;
+            box-shadow: inset 0 1px 1px rgba(255,255,255,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        .screw-dot::after {
+            content: "+";
+            color: #0f172a;
+            font-size: 11px;
+            font-weight: 900;
+            line-height: 1;
+        }
+        .rack-model-badge {
+            font-family: var(--font-mono);
+            font-size: 0.72rem;
+            color: #94a3b8;
+            letter-spacing: 0.1em;
+            background: #0f172a;
+            padding: 3px 10px;
+            border-radius: 3px;
+            border: 1px solid #334155;
+        }
+        .rack-brand {
+            font-size: 1.1rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            color: #f8fafc;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .rack-brand span {
+            color: #38bdf8;
+            font-weight: 400;
+            font-size: 0.85rem;
+            border-left: 2px solid #334155;
+            padding-left: 8px;
+        }
+
+        /* 硬件指示灯组 (Hardware LED Array) */
+        .led-array {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            background: #0b0e14;
+            padding: 6px 14px;
+            border-radius: 4px;
+            border: 1px solid #1e293b;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.6);
+        }
+        .led-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            color: #94a3b8;
+            font-weight: 600;
+        }
+        .led-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #334155;
+            box-shadow: inset 0 1px 2px rgba(0,0,0,0.8);
+            position: relative;
+        }
+        .led-indicator.active-green {
+            background: #10b981;
+            box-shadow: 0 0 8px #10b981, inset 0 1px 1px #a7f3d0;
+            animation: pulse-led 2s infinite ease-in-out;
+        }
+        .led-indicator.active-amber {
+            background: #f59e0b;
+            box-shadow: 0 0 8px #f59e0b, inset 0 1px 1px #fde68a;
+        }
+        .led-indicator.active-cyan {
+            background: #06b6d4;
+            box-shadow: 0 0 8px #06b6d4, inset 0 1px 1px #a5f3fc;
+        }
+        @keyframes pulse-led {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(0.92); }
+        }
+
+        /* 物理微动拨动控制舱 (Rocker & Dial Controls) */
+        .rack-controls-unit {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .rack-rotary-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #0b0e14;
+            padding: 4px 10px;
+            border-radius: 4px;
+            border: 1px solid #1e293b;
+        }
+        .rack-rotary-label {
+            font-family: var(--font-mono);
+            font-size: 0.72rem;
+            color: #94a3b8;
+            text-transform: uppercase;
+        }
+        .rack-select {
+            background: #1a2230;
+            color: #38bdf8;
+            border: 1px solid #334155;
+            padding: 4px 10px;
+            border-radius: 3px;
+            font-family: var(--font-mono);
+            font-size: 0.82rem;
+            font-weight: 700;
+            outline: none;
+            cursor: pointer;
+        }
+        .rack-btn {
+            background: linear-gradient(180deg, #334155 0%, #1e293b 100%);
+            border: 1px solid #475569;
+            color: #f1f5f9;
+            padding: 6px 14px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.15);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.1s;
+        }
+        .rack-btn:active {
+            transform: translateY(1px);
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.6);
+        }
+        .rack-btn.btn-run {
+            background: linear-gradient(180deg, #059669 0%, #047857 100%);
+            border-color: #10b981;
+            color: #ffffff;
+            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4), inset 0 1px 0 rgba(255,255,255,0.25);
+        }
+
+        /* 核心网格布局 (Main Workstation Grid) */
+        .rack-grid {
+            display: grid;
+            grid-template-columns: 360px 1fr 420px;
+            gap: 18px;
+            align-items: start;
+        }
+        @media (max-width: 1200px) {
+            .rack-grid { grid-template-columns: 1fr 1fr; }
+        }
+        @media (max-width: 800px) {
+            .rack-grid { grid-template-columns: 1fr; }
+        }
+
+        /* 仪器面板单元基类 (Chassis Panel Unit) */
+        .chassis-panel {
+            background: #141923;
+            border: 2px solid #283344;
+            border-radius: 6px;
+            overflow: hidden;
+            box-shadow: 
+                0 8px 24px rgba(0,0,0,0.6),
+                inset 0 1px 0 rgba(255,255,255,0.05);
+            display: flex;
+            flex-direction: column;
+        }
+        .chassis-title-bar {
+            background: linear-gradient(180deg, #1e2634 0%, #161d27 100%);
+            border-bottom: 2px solid #283344;
+            padding: 8px 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .chassis-title {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: #cbd5e1;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            font-family: var(--font-mono);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .chassis-tag {
+            font-size: 0.68rem;
+            padding: 2px 6px;
+            border-radius: 2px;
+            background: #0f172a;
+            border: 1px solid #334155;
+            color: #38bdf8;
+            font-family: var(--font-mono);
+        }
+        .chassis-body {
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        /* === 监视器单元：沉降金属框 + 逼真 CRT === */
+        .recessed-crt-monitor {
+            background: #05070a;
+            border: 4px solid #1a2230;
+            border-top: 4px solid #10151f;
+            border-left: 4px solid #10151f;
+            border-radius: 8px;
+            padding: 8px;
+            box-shadow: 
+                inset 0 6px 16px rgba(0,0,0,0.9),
+                0 2px 4px rgba(255,255,255,0.05);
+            position: relative;
+        }
+        .crt-bezel-screen {
+            height: 250px;
+            background: #020305;
+            border-radius: 6px;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #111827;
+            box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.9);
+        }
+        /* 真实的 CRT 扫描线与磷光栅格 */
+        .crt-bezel-screen::after {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(rgba(18, 25, 40, 0) 50%, rgba(0, 0, 0, 0.3) 50%);
+            background-size: 100% 4px;
+            pointer-events: none;
+            opacity: 0.85;
+            z-index: 5;
+        }
+        /* 模拟 CRT 球面玻璃弧形高光 */
+        .crt-glass-glare {
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 60%;
+            background: linear-gradient(180deg, rgba(255,255,255,0.04) 0%, transparent 100%);
+            pointer-events: none;
+            z-index: 6;
+            border-radius: 6px 6px 0 0;
+        }
+        /* 屏幕模拟图像内容 */
+        .crt-mock-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            filter: contrast(1.08) brightness(0.95);
+        }
+        /* OSD 屏显叠加字符 (On-Screen Display) */
+        .crt-osd-top {
+            position: absolute;
+            top: 8px; left: 10px; right: 10px;
+            display: flex;
+            justify-content: space-between;
+            font-family: var(--font-mono);
+            font-size: 0.72rem;
+            color: #10b981;
+            text-shadow: 0 0 6px rgba(16, 185, 129, 0.7);
+            z-index: 7;
+            pointer-events: none;
+        }
+        .crt-osd-bottom {
+            position: absolute;
+            bottom: 8px; left: 10px; right: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            color: #38bdf8;
+            text-shadow: 0 0 6px rgba(56, 189, 248, 0.7);
+            z-index: 7;
+        }
+        .osd-action-btn {
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid #1e293b;
+            color: #e2e8f0;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 0.68rem;
+            cursor: pointer;
+            pointer-events: auto;
+            text-shadow: none;
+        }
+        .osd-action-btn:hover {
+            background: #1e293b;
+            color: #38bdf8;
+        }
+
+        /* === 刀片插槽式多账号模块 (Blade Module Deck) === */
+        .blade-slot {
+            background: #10151f;
+            border: 1px solid #283344;
+            border-left: 5px solid #475569;
+            border-radius: 4px;
+            padding: 10px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+            position: relative;
+        }
+        .blade-slot.slot-active {
+            border-left-color: #10b981;
+            background: linear-gradient(90deg, rgba(16, 185, 129, 0.08) 0%, #10151f 100%);
+        }
+        .blade-slot.slot-idle {
+            border-left-color: #f59e0b;
+        }
+        .blade-top-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .blade-identity {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .blade-badge-slotno {
+            font-family: var(--font-mono);
+            font-size: 0.68rem;
+            color: #94a3b8;
+            background: #090c12;
+            padding: 2px 6px;
+            border-radius: 2px;
+            border: 1px solid #1e293b;
+        }
+        .blade-name {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: #f8fafc;
+        }
+        .blade-meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.74rem;
+            color: #64748b;
+            font-family: var(--font-mono);
+        }
+
+        /* === 工业导轨式任务流水线 (Track Conveyor Tasks) === */
+        .rack-task-item {
+            background: #10141d;
+            border: 1px solid #283344;
+            border-radius: 4px;
+            padding: 12px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            position: relative;
+        }
+        .rack-task-item.task-running {
+            border-color: #0284c7;
+            box-shadow: 0 0 12px rgba(2, 132, 199, 0.2);
+        }
+        .rack-task-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+        .rack-task-title {
+            font-weight: 700;
+            font-size: 0.88rem;
+            color: #f1f5f9;
+        }
+        .rack-task-unit {
+            font-size: 0.78rem;
+            color: #64748b;
+        }
+        .rack-progress-bar {
+            height: 10px;
+            background: #090c12;
+            border-radius: 2px;
+            overflow: hidden;
+            border: 1px solid #1e293b;
+            position: relative;
+        }
+        .rack-progress-fill {
+            height: 100%;
+            background: repeating-linear-gradient(
+                -45deg,
+                #0284c7,
+                #0284c7 8px,
+                #0369a1 8px,
+                #0369a1 16px
+            );
+            box-shadow: 0 0 8px rgba(2, 132, 199, 0.6);
+            transition: width 0.3s;
+        }
+        .rack-task-stats {
+            display: flex;
+            justify-content: space-between;
+            font-family: var(--font-mono);
+            font-size: 0.74rem;
+            color: #94a3b8;
+        }
+
+        /* === 工业终端控制台日志 (Industrial Terminal Stream) === */
+        .industrial-terminal {
+            background: #06080c;
+            border: 1px solid #1e293b;
+            border-radius: 4px;
+            padding: 10px;
+            font-family: var(--font-mono);
+            font-size: 0.76rem;
+            height: 220px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            box-shadow: inset 0 2px 8px rgba(0,0,0,0.8);
+        }
+        .terminal-row {
+            line-height: 1.4;
+            display: flex;
+            gap: 8px;
+        }
+        .log-time { color: #475569; }
+        .log-tag-ai { color: #06b6d4; font-weight: 700; }
+        .log-tag-info { color: #10b981; }
+        .log-tag-warn { color: #f59e0b; }
+        .log-msg { color: #cbd5e1; }
+    </style>
+</head>
+<body>
+
+    <!-- 顶部方案切换条 -->
+    <div class="demo-nav-bar">
+        <div class="demo-nav-title">
+            <span>SCHEME EVALUATION</span>
+            工作台美学探索 · 纯前端高保真原型
+        </div>
+        <div class="demo-nav-links">
+            <a href="demo-a-rackmount.html" class="demo-nav-btn active">🎛️ 方案 A: 机架式工控仪表台</a>
+            <a href="demo-b-terminal.html" class="demo-nav-btn">💻 方案 B: 极简密态极光终端</a>
+            <a href="demo-c-broadcast.html" class="demo-nav-btn">🎥 方案 C: 现场导播导控台</a>
+            <a href="index.html" class="demo-nav-btn">🔙 返回生产工作台</a>
+        </div>
+    </div>
+
+    <!-- 19寸工业机柜外壳 -->
+    <div class="rack-cabinet">
+        <div class="rack-inner">
+
+            <!-- 顶部机架总控头 (Rack Unit Header) -->
+            <div class="rack-header-unit">
+                <div class="rack-title-group">
+                    <div class="screw-dot"></div>
+                    <div class="rack-model-badge">RU-1904 // REVISION-A</div>
+                    <div class="rack-brand">
+                        XXT-OPERATOR <span>多租户智能并发挂机调度工作站</span>
+                    </div>
+                </div>
+
+                <!-- 硬件指示灯组 -->
+                <div class="led-array">
+                    <div class="led-item">
+                        <div class="led-indicator active-green"></div>
+                        PWR / ONLINE
+                    </div>
+                    <div class="led-item">
+                        <div class="led-indicator active-cyan"></div>
+                        AI COPILOT
+                    </div>
+                    <div class="led-item">
+                        <div class="led-indicator active-amber"></div>
+                        RESIDENTIAL IP: 114.220.89.14
+                    </div>
+                    <div class="led-item">
+                        <div class="led-indicator active-green"></div>
+                        SYNC: LOCK
+                    </div>
+                </div>
+
+                <!-- 控制旋钮与微动动作 -->
+                <div class="rack-controls-unit">
+                    <div class="rack-rotary-group">
+                        <span class="rack-rotary-label">并发阈值:</span>
+                        <select class="rack-select">
+                            <option>2 线程 (推荐)</option>
+                            <option>3 线程 (极速)</option>
+                            <option>1 线程 (单核)</option>
+                        </select>
+                    </div>
+                    <button class="rack-btn btn-run" onclick="alert('【方案A原型交互】模拟启动全部挂机队列')">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                        启动总调度
+                    </button>
+                    <div class="screw-dot"></div>
+                </div>
+            </div>
+
+            <!-- 三栏精密机架工作区 -->
+            <div class="rack-grid">
+
+                <!-- 左侧：刀片服务器式账号插槽 (Account Blades) -->
+                <div class="chassis-panel">
+                    <div class="chassis-title-bar">
+                        <div class="chassis-title">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                            账户插槽阵列 (SLOT ARRAY)
+                        </div>
+                        <span class="chassis-tag">2 / 4 MOUNTED</span>
+                    </div>
+                    <div class="chassis-body">
+                        <!-- 插槽 1 -->
+                        <div class="blade-slot slot-active">
+                            <div class="blade-top-row">
+                                <div class="blade-identity">
+                                    <span class="blade-badge-slotno">BAY-01</span>
+                                    <span class="blade-name">张同学 (2024010892)</span>
+                                </div>
+                                <span class="led-indicator active-green" title="执行中"></span>
+                            </div>
+                            <div class="blade-meta">
+                                <span>当前载荷: 1 门活跃课程</span>
+                                <span style="color:#10b981">EXEC_RUNNING</span>
+                            </div>
+                        </div>
+
+                        <!-- 插槽 2 -->
+                        <div class="blade-slot slot-idle">
+                            <div class="blade-top-row">
+                                <div class="blade-identity">
+                                    <span class="blade-badge-slotno">BAY-02</span>
+                                    <span class="blade-name">李同学 (2024010893)</span>
+                                </div>
+                                <span class="led-indicator active-amber" title="就绪待命"></span>
+                            </div>
+                            <div class="blade-meta">
+                                <span>当前载荷: 待命中 (0 任务)</span>
+                                <span style="color:#f59e0b">STANDBY</span>
+                            </div>
+                        </div>
+
+                        <!-- 插入新插槽按钮 -->
+                        <button class="rack-btn" style="width:100%; justify-content:center;" onclick="alert('【方案A原型交互】唤起物理挂载扫码面板')">
+                            + 挂载新超星账号插槽
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 中间：工业传送带式任务流水线 (Track Conveyor) -->
+                <div class="chassis-panel">
+                    <div class="chassis-title-bar">
+                        <div class="chassis-title">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+                            调度流水线 (TASK CONVEYOR)
+                        </div>
+                        <span class="chassis-tag">1 RUNNING · 1 QUEUED</span>
+                    </div>
+                    <div class="chassis-body">
+                        <!-- 任务 1：运行中 -->
+                        <div class="rack-task-item task-running">
+                            <div class="rack-task-top">
+                                <div>
+                                    <div class="rack-task-title">毛泽东思想和中国特色社会主义理论体系概论</div>
+                                    <div class="rack-task-unit">第4章 建设中国特色社会主义总依据 · 视频播放中 (1.5x)</div>
+                                </div>
+                                <span class="chassis-tag" style="background:#0284c7; color:#fff">RUNNING</span>
+                            </div>
+                            <div class="rack-progress-bar">
+                                <div class="rack-progress-fill" style="width: 78.4%;"></div>
+                            </div>
+                            <div class="rack-task-stats">
+                                <span>节点进度: 78.4% (12/15)</span>
+                                <span>耗时: 00:14:28 · 账号: BAY-01</span>
+                            </div>
+                        </div>
+
+                        <!-- 任务 2：排队就绪 -->
+                        <div class="rack-task-item">
+                            <div class="rack-task-top">
+                                <div>
+                                    <div class="rack-task-title">大学英语(三) · 综合教程</div>
+                                    <div class="rack-task-unit">Unit 3 Passage B · AI 答题就绪</div>
+                                </div>
+                                <span class="chassis-tag" style="background:#334155; color:#cbd5e1">QUEUED</span>
+                            </div>
+                            <div class="rack-progress-bar">
+                                <div class="rack-progress-fill" style="width: 35%; background: #475569;"></div>
+                            </div>
+                            <div class="rack-task-stats">
+                                <span>节点进度: 35.0% (5/14)</span>
+                                <span>排队中 · 账号: BAY-02</span>
+                            </div>
+                        </div>
+
+                        <!-- 快速进料投递舱 -->
+                        <div style="background:#0b0e14; border:1px solid #1e293b; border-radius:4px; padding:10px; display:flex; gap:8px;">
+                            <input type="text" placeholder="录入超星课程任务链接 (https://mooc1.chaoxing.com/...)" style="flex:1; background:#141923; border:1px solid #334155; color:#fff; padding:6px 10px; border-radius:3px; font-size:0.8rem; outline:none;">
+                            <button class="rack-btn btn-run">送入机架队列</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右侧：沉降金属框 CRT 监视器 + 工业终端日志 -->
+                <div class="chassis-panel">
+                    <div class="chassis-title-bar">
+                        <div class="chassis-title">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                            现场光学监视器 (CRT PROBE)
+                        </div>
+                        <span class="chassis-tag" style="color:#10b981;">FEED LIVE</span>
+                    </div>
+                    <div class="chassis-body">
+                        <!-- 沉降式真实 CRT 监视器 -->
+                        <div class="recessed-crt-monitor">
+                            <div class="crt-bezel-screen">
+                                <div class="crt-glass-glare"></div>
+                                <div class="crt-osd-top">
+                                    <span>● CH-01 [PROBE-LIVE]</span>
+                                    <span>1080P // 60FPS</span>
+                                </div>
+                                <svg class="crt-mock-image" viewBox="0 0 400 250" style="background:#070b12;">
+                                    <!-- 模拟网页内容 -->
+                                    <rect x="20" y="20" width="360" height="25" fill="#1e293b" rx="3"/>
+                                    <text x="35" y="37" fill="#38bdf8" font-size="11" font-family="monospace">chaoxing.com/mycourse/studentstudy</text>
+                                    <rect x="20" y="55" width="240" height="135" fill="#0f172a" stroke="#334155" stroke-width="1"/>
+                                    <circle cx="140" cy="122" r="22" fill="#0284c7" opacity="0.8"/>
+                                    <polygon points="135,112 152,122 135,132" fill="#fff"/>
+                                    <rect x="270" y="55" width="110" height="15" fill="#1e293b"/>
+                                    <rect x="270" y="78" width="90" height="10" fill="#334155"/>
+                                    <rect x="270" y="96" width="105" height="10" fill="#334155"/>
+                                    <rect x="270" y="114" width="80" height="10" fill="#334155"/>
+                                    <rect x="270" y="140" width="110" height="30" fill="#065f46" rx="3"/>
+                                    <text x="282" y="160" fill="#34d399" font-size="10" font-family="monospace">AI PASS: 100%</text>
+                                </svg>
+                                <div class="crt-osd-bottom">
+                                    <span>FPS: 24 · AUTO-REFRESH 1.0s</span>
+                                    <button class="osd-action-btn" onclick="alert('【方案A原型交互】触发全屏无损放大监视器')">全景放大</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 工业终端日志流 -->
+                        <div class="industrial-terminal">
+                            <div class="terminal-row">
+                                <span class="log-time">[03:22:15]</span>
+                                <span class="log-tag-info">[CHASSIS]</span>
+                                <span class="log-msg">机架就绪，总线连接正常 (4.2MB/s)</span>
+                            </div>
+                            <div class="terminal-row">
+                                <span class="log-time">[03:22:30]</span>
+                                <span class="log-tag-ai">[AI_SOLV]</span>
+                                <span class="log-msg">题型识别: 单选题 -> 锁定选项 B (置信度 99.4%)</span>
+                            </div>
+                            <div class="terminal-row">
+                                <span class="log-time">[03:22:45]</span>
+                                <span class="log-tag-info">[VIDEO]</span>
+                                <span class="log-msg">视频播放至 08:30 / 12:45 (倍速 1.5x 无丢帧)</span>
+                            </div>
+                            <div class="terminal-row">
+                                <span class="log-time">[03:23:01]</span>
+                                <span class="log-tag-warn">[CAPTCHA]</span>
+                                <span class="log-msg">检测到滑动微验证，本地探针在 420ms 内自动解算通过</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+
+</body>
+</html>

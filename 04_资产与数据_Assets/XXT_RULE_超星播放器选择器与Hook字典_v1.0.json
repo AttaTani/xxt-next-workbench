@@ -1,0 +1,40 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "project": "XXT",
+  "description": "超星/学习通自动化挂机播放器选择器与防作弊Hook规则字典",
+  "version": "1.0.0",
+  "selectors": {
+    "course": {
+      "catalogTree": ".timeline .posCatalog_select, .catalog_tabel, .articlenavlist",
+      "chapterItem": ".posCatalog_select .posCatalog_name, .catalog_tabel li",
+      "activeChapter": ".posCatalog_select.active, .catalog_tabel .cur",
+      "unitStatusIcon": ".job_icon, .icon_finish, .roundpointStudent"
+    },
+    "iframe": {
+      "contentIframe": "iframe#iframe, iframe[src*='ananas/modules/video'], iframe[name='content']",
+      "videoIframe": "iframe[src*='ananas/modules/video/index.html']"
+    },
+    "player": {
+      "videoElement": "video#video_html5_api, video",
+      "playButton": ".vjs-big-play-button, .vjs-play-control",
+      "progressBar": ".vjs-progress-control, .vjs-play-progress",
+      "timeDisplay": ".vjs-current-time-display, .vjs-duration-display",
+      "speedSelector": ".vjs-playback-rate .vjs-menu-item"
+    },
+    "quiz": {
+      "questionModal": ".ans-job-icon, .ans-dialog, .ans-dialog-content",
+      "answerOption": ".ans-videoquiz-opt input, .ans-videoquiz-title",
+      "submitButton": "#ext-gen1045, .ans-videoquiz-submit"
+    },
+    "antispider": {
+      "container": "#captcha, .antispider-box, #popup-captcha",
+      "alertText": "9010",
+      "captchaImage": "#captcha-img, .geetest_canvas_img, img[src*='captcha']"
+    }
+  },
+  "hooks": {
+    "antiBlur": "window.onblur = null; window.onfocus = null;",
+    "antiVisibilityChange": "Object.defineProperty(document, 'hidden', { get: () => false }); Object.defineProperty(document, 'visibilityState', { get: () => 'visible' });",
+    "antiPause": "HTMLVideoElement.prototype._pause = HTMLVideoElement.prototype.pause;"
+  }
+}

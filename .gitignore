@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# User Data & Sensitive Sessions
+userData/
+**/userData/
+auth_state.json
+auth_*.json
+**/auth_*.json
+qrcode.png
+*.png
+.env
+.env.*
+config.json
+**/config.json
+Remote
+api keys*.txt
+*.pem
+*.key
+
+# Runtime Logs
+*.log
+logs/
+npm-debug.log*
+
+# OS & Editor Files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Root temporary diagnostic screenshots (must be saved into 05_测试与验收_QA/screenshots/)
+/*.png

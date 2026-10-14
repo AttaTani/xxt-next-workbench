@@ -1,0 +1,23 @@
+{
+  "port": 3888,
+  "playbackRate": 1,
+  "autoAdvanceNoVideo": false,
+  "courseUrl": "https://mooc1-2.chaoxing.com/mooc-ans/mycourse/studentcourse?courseId=...",
+  "headless": true,
+  "riskSuspendMinutes": 10,
+  "maxConsecutiveCaptcha": 2,
+  "qwenApiKey": "YOUR_DASHSCOPE_API_KEY",
+  "qwenBaseUrl": "https://maas.qianwenaiapi.com/compatible-mode/v1",
+  "aiModel": "qwen3-vl-plus",
+  "textContentModel": "qwen-plus",
+  "visionContentModel": "qwen3-vl-plus",
+  "enableHybridRouting": true,
+  "enableAiDoctor": true,
+  "aiDoctorIntervalMinutes": 2,
+  "aiDoctorModel": "qwen-plus",
+  "enableChapterExamSolving": true,
+  "examSubmitMode": "AUTO_SUBMIT",
+  "examDelayBetweenClicksMs": 250,
+  "examModel": "qwen-plus",
+  "maxConcurrent": 1
+}

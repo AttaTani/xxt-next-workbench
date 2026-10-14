@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>方案 C：现场导播导控台 (Broadcast Director Deck) · 视觉原型</title>
+    <style>
+        :root {
+            --deck-bg: #0a0a0e;
+            --deck-console: #12131a;
+            --deck-panel: #181924;
+            --deck-border: #262938;
+            --deck-tally-red: #ef4444;
+            --deck-tally-green: #10b981;
+            --deck-amber: #f59e0b;
+            --deck-cyan: #06b6d4;
+            --deck-text: #f8fafc;
+            --deck-muted: #64748b;
+            --font-mono: "JetBrains Mono", Consolas, "Courier New", monospace;
+            --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", sans-serif;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: var(--deck-bg);
+            color: var(--deck-text);
+            font-family: var(--font-sans);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding-bottom: 30px;
+        }
+
+        /* 顶部方案切换导航条 */
+        .demo-nav-bar {
+            background: #060608;
+            border-bottom: 1px solid var(--deck-border);
+            padding: 8px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+        .demo-nav-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 700;
+            color: #94a3b8;
+        }
+        .demo-nav-title span {
+            color: var(--deck-tally-red);
+            background: rgba(239, 68, 68, 0.1);
+            padding: 2px 8px;
+            border-radius: 3px;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            font-family: var(--font-mono);
+        }
+        .demo-nav-links { display: flex; gap: 8px; }
+        .demo-nav-btn {
+            padding: 5px 12px;
+            border-radius: 4px;
+            text-decoration: none;
+            color: #94a3b8;
+            background: #12131c;
+            border: 1px solid var(--deck-border);
+            font-weight: 600;
+            font-size: 0.76rem;
+            transition: all 0.15s;
+        }
+        .demo-nav-btn:hover { color: #fff; border-color: #64748b; }
+        .demo-nav-btn.active {
+            color: #fff;
+            background: #b91c1c;
+            border-color: var(--deck-tally-red);
+            box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+        }
+
+        /* 导播控制台主容器 */
+        .director-deck-container {
+            max-width: 1400px;
+            margin: 20px auto 0;
+            width: calc(100% - 32px);
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        /* === 核心：顶部超宽幅中央主监视舱 (Master Program Monitor) === */
+        .program-monitor-bay {
+            background: var(--deck-console);
+            border: 2px solid var(--deck-border);
+            border-radius: 8px;
+            padding: 16px;
+            box-shadow: 0 12px 36px rgba(0,0,0,0.8);
+            display: grid;
+            grid-template-columns: 1fr 340px;
+            gap: 16px;
+        }
+        @media (max-width: 992px) {
+            .program-monitor-bay { grid-template-columns: 1fr; }
+        }
+
+        /* CRT 广播主视口 */
+        .crt-broadcast-screen {
+            height: 380px;
+            background: #020305;
+            border-radius: 6px;
+            position: relative;
+            overflow: hidden;
+            border: 2px solid #1e2230;
+            box-shadow: inset 0 0 50px rgba(0, 0, 0, 0.95);
+        }
+        /* 广播级 CRT 细腻光栅 */
+        .crt-broadcast-screen::after {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(rgba(18, 25, 40, 0) 50%, rgba(0, 0, 0, 0.35) 50%);
+            background-size: 100% 4px;
+            pointer-events: none;
+            opacity: 0.75;
+            z-index: 5;
+        }
+        /* 广播九宫格安全框线 (Action & Title Safe) */
+        .broadcast-safe-guides {
+            position: absolute;
+            top: 24px; bottom: 24px; left: 32px; right: 32px;
+            border: 1px dashed rgba(255, 255, 255, 0.12);
+            pointer-events: none;
+            z-index: 6;
+        }
+        .broadcast-safe-guides::after {
+            content: "";
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 16px; height: 16px;
+            border-top: 1px solid rgba(255, 255, 255, 0.25);
+            border-left: 1px solid rgba(255, 255, 255, 0.25);
+        }
+
+        /* 顶部 Tally 现场灯 & 时间码 */
+        .monitor-tally-bar {
+            position: absolute;
+            top: 10px; left: 14px; right: 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 8;
+            font-family: var(--font-mono);
+        }
+        .tally-badge-live {
+            background: #b91c1c;
+            color: #fff;
+            padding: 3px 10px;
+            border-radius: 3px;
+            font-size: 0.75rem;
+            font-weight: 800;
+            letter-spacing: 0.1em;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 0 12px rgba(239, 68, 68, 0.6);
+            animation: blink-live 1.5s infinite;
+        }
+        @keyframes blink-live {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+        .timecode-display {
+            background: rgba(0, 0, 0, 0.85);
+            border: 1px solid #334155;
+            color: var(--deck-tally-green);
+            padding: 4px 12px;
+            border-radius: 3px;
+            font-size: 0.88rem;
+            font-weight: 700;
+            text-shadow: 0 0 8px rgba(16, 185, 129, 0.8);
+            letter-spacing: 0.08em;
+        }
+
+        /* 监视器右侧：音视频电平表与当前流状态 (Telemetry & VU Meter) */
+        .telemetry-side {
+            background: #0f1017;
+            border: 1px solid var(--deck-border);
+            border-radius: 6px;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .telemetry-title {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: #94a3b8;
+            font-weight: 700;
+            border-bottom: 1px solid var(--deck-border);
+            padding-bottom: 6px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .vu-meter-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: var(--font-mono);
+            font-size: 0.72rem;
+        }
+        .vu-meter-bar {
+            flex: 1;
+            height: 12px;
+            background: #1e2230;
+            border-radius: 2px;
+            overflow: hidden;
+            display: flex;
+        }
+        .vu-seg-green { width: 65%; background: var(--deck-tally-green); }
+        .vu-seg-amber { width: 20%; background: var(--deck-amber); }
+        .vu-seg-red { width: 15%; background: var(--deck-tally-red); }
+
+        /* === 下方：导播物理按键面板 (Broadcast Switcher Desk) === */
+        .switcher-desk {
+            background: var(--deck-console);
+            border: 2px solid var(--deck-border);
+            border-radius: 8px;
+            padding: 16px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        @media (max-width: 992px) {
+            .switcher-desk { grid-template-columns: 1fr; }
+        }
+
+        .bus-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .bus-label {
+            width: 70px;
+            font-family: var(--font-mono);
+            font-size: 0.72rem;
+            color: #94a3b8;
+            font-weight: 700;
+        }
+        /* 导播台半透明水晶发光按键 */
+        .switcher-key {
+            background: #1e2230;
+            border: 1px solid #33394d;
+            color: #cbd5e1;
+            padding: 10px 16px;
+            border-radius: 4px;
+            font-family: var(--font-mono);
+            font-size: 0.78rem;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.1), 0 2px 4px rgba(0,0,0,0.5);
+            transition: all 0.1s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 3px;
+        }
+        .switcher-key:active { transform: translateY(1px); }
+        .switcher-key.active-pgm {
+            background: #b91c1c;
+            border-color: #ef4444;
+            color: #fff;
+            box-shadow: 0 0 14px rgba(239, 68, 68, 0.7), inset 0 1px 0 rgba(255,255,255,0.3);
+        }
+        .switcher-key.active-pvw {
+            background: #047857;
+            border-color: #10b981;
+            color: #fff;
+            box-shadow: 0 0 14px rgba(16, 185, 129, 0.7), inset 0 1px 0 rgba(255,255,255,0.3);
+        }
+
+        /* 导播控制台任务走马灯卡片 */
+        .director-task-card {
+            background: #11131c;
+            border: 1px solid var(--deck-border);
+            border-radius: 6px;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .director-task-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .director-progress-track {
+            height: 8px;
+            background: #1e2230;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        .director-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ef4444, #f59e0b);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 顶部方案切换条 -->
+    <div class="demo-nav-bar">
+        <div class="demo-nav-title">
+            <span>SCHEME EVALUATION</span>
+            工作台美学探索 · 纯前端高保真原型
+        </div>
+        <div class="demo-nav-links">
+            <a href="demo-a-rackmount.html" class="demo-nav-btn">🎛️ 方案 A: 机架式工控仪表台</a>
+            <a href="demo-b-terminal.html" class="demo-nav-btn">💻 方案 B: 极简密态极光终端</a>
+            <a href="demo-c-broadcast.html" class="demo-nav-btn active">🎥 方案 C: 现场导播导控台</a>
+            <a href="index.html" class="demo-nav-btn">🔙 返回生产工作台</a>
+        </div>
+    </div>
+
+    <!-- 导播主控舱容器 -->
+    <div class="director-deck-container">
+
+        <!-- 顶部中央主监视舱 (Master Program Monitor Bay) -->
+        <div class="program-monitor-bay">
+            <!-- 宽幅 CRT 导播主屏 -->
+            <div class="crt-broadcast-screen">
+                <div class="broadcast-safe-guides"></div>
+                <div class="monitor-tally-bar">
+                    <div class="tally-badge-live">
+                        <span>●</span> PGM 1 (ON-AIR LIVE)
+                    </div>
+                    <div class="timecode-display">
+                        TC: 00:14:28:12
+                    </div>
+                </div>
+
+                <!-- 模拟超星做题直播推流画面 -->
+                <svg viewBox="0 0 600 380" style="width:100%; height:100%; background:#05070c;">
+                    <rect x="30" y="30" width="540" height="35" fill="#151926" rx="4"/>
+                    <text x="50" y="52" fill="#38bdf8" font-size="13" font-family="monospace">PROGRAM 1: 毛泽东思想和中国特色社会主义理论体系概论</text>
+                    <rect x="30" y="80" width="360" height="230" fill="#0b0e17" stroke="#252d42"/>
+                    <circle cx="210" cy="195" r="32" fill="#ef4444" opacity="0.85"/>
+                    <polygon points="202,180 224,195 202,210" fill="#fff"/>
+                    <rect x="410" y="80" width="160" height="20" fill="#1e2538"/>
+                    <rect x="410" y="110" width="130" height="12" fill="#1e2538"/>
+                    <rect x="410" y="130" width="145" height="12" fill="#1e2538"/>
+                    <rect x="410" y="160" width="160" height="40" fill="#065f46" rx="4"/>
+                    <text x="430" y="185" fill="#34d399" font-size="12" font-family="monospace">AI SOLVE: OK</text>
+                    <text x="430" y="240" fill="#94a3b8" font-size="11" font-family="monospace">BITRATE: 4.8 Mbps</text>
+                    <text x="430" y="260" fill="#94a3b8" font-size="11" font-family="monospace">FPS: 60.00 LOCKED</text>
+                </svg>
+            </div>
+
+            <!-- 右侧：遥测与状态仪表 -->
+            <div class="telemetry-side">
+                <div class="telemetry-title">
+                    <span>AUDIO & STREAM TELEMETRY</span>
+                    <span style="color:var(--deck-tally-green)">NORMAL</span>
+                </div>
+                <div class="vu-meter-row">
+                    <span style="width:30px;">CH 1</span>
+                    <div class="vu-meter-bar">
+                        <div class="vu-seg-green"></div>
+                        <div class="vu-seg-amber"></div>
+                        <div class="vu-seg-red" style="opacity:0.2"></div>
+                    </div>
+                    <span>-6dB</span>
+                </div>
+                <div class="vu-meter-row">
+                    <span style="width:30px;">CH 2</span>
+                    <div class="vu-meter-bar">
+                        <div class="vu-seg-green" style="width:58%"></div>
+                        <div class="vu-seg-amber" style="width:15%"></div>
+                        <div class="vu-seg-red" style="opacity:0.2"></div>
+                    </div>
+                    <span>-9dB</span>
+                </div>
+
+                <div style="margin-top:10px; font-size:0.75rem; color:#94a3b8; display:flex; flex-direction:column; gap:6px;">
+                    <div>出口 IP: <b style="color:#fff">114.220.89.14 (家宽机房)</b></div>
+                    <div>推流协议: <b style="color:#38bdf8">WEBRTC / ULTRA-LOW</b></div>
+                    <div>答题引擎: <b style="color:var(--deck-tally-green)">DEEPSEEK-V3 DUAL</b></div>
+                </div>
+
+                <button style="margin-top:auto; background:#1e2435; border:1px solid #334155; color:#fff; padding:8px; border-radius:4px; font-weight:700; cursor:pointer;" onclick="alert('【方案C原型交互】唤起 4K 巨幕监视全屏模式')">
+                    ⛶ 全景大监看窗
+                </button>
+            </div>
+        </div>
+
+        <!-- 下方：导播物理按键控台与任务流 (Broadcast Switcher Desk) -->
+        <div class="switcher-desk">
+            <!-- 左侧：多机位导播切换总线 (Bus Switcher) -->
+            <div style="display:flex; flex-direction:column; gap:12px;">
+                <div style="font-family:var(--font-mono); font-size:0.75rem; color:#94a3b8; font-weight:700;">
+                    // DIRECTORS MULTI-BUS SWITCHER (租户机位选择)
+                </div>
+                <!-- PGM 正在直播通道 -->
+                <div class="bus-row">
+                    <span class="bus-label">PGM 主路:</span>
+                    <button class="switcher-key active-pgm">
+                        <span>CAM 1</span>
+                        <span style="font-size:0.65rem;">张同学</span>
+                    </button>
+                    <button class="switcher-key" onclick="alert('【方案C原型交互】切换主路至 CAM 2 李同学')">
+                        <span>CAM 2</span>
+                        <span style="font-size:0.65rem;">李同学</span>
+                    </button>
+                    <button class="switcher-key">
+                        <span>CAM 3</span>
+                        <span style="font-size:0.65rem;">待挂载</span>
+                    </button>
+                </div>
+                <!-- PVW 预监通道 -->
+                <div class="bus-row">
+                    <span class="bus-label">PVW 预监:</span>
+                    <button class="switcher-key">
+                        <span>CAM 1</span>
+                        <span style="font-size:0.65rem;">张同学</span>
+                    </button>
+                    <button class="switcher-key active-pvw">
+                        <span>CAM 2</span>
+                        <span style="font-size:0.65rem;">李同学</span>
+                    </button>
+                    <button class="switcher-key">
+                        <span>CAM 3</span>
+                        <span style="font-size:0.65rem;">待挂载</span>
+                    </button>
+                </div>
+                <!-- 切换动作 -->
+                <div class="bus-row" style="margin-top:6px;">
+                    <button style="background:var(--deck-tally-red); color:#fff; border:none; padding:8px 24px; border-radius:4px; font-weight:800; font-family:var(--font-mono); cursor:pointer;">
+                        CUT 切播
+                    </button>
+                    <button style="background:#1e2435; color:#cbd5e1; border:1px solid #334155; padding:8px 20px; border-radius:4px; font-weight:700; font-family:var(--font-mono); cursor:pointer;">
+                        AUTO 自动
+                    </button>
+                </div>
+            </div>
+
+            <!-- 右侧：当前机位任务推进跑道 -->
+            <div style="display:flex; flex-direction:column; gap:10px;">
+                <div style="font-family:var(--font-mono); font-size:0.75rem; color:#94a3b8; font-weight:700; display:flex; justify-content:space-between;">
+                    <span>// ON-AIR TASK PIPELINE</span>
+                    <span style="color:var(--deck-tally-green)">RUNNING (1.5x)</span>
+                </div>
+                <div class="director-task-card">
+                    <div class="director-task-top">
+                        <b style="font-size:0.85rem;">毛泽东思想和中国特色社会主义理论体系概论</b>
+                        <span style="color:var(--deck-amber); font-family:var(--font-mono); font-size:0.75rem;">78.4%</span>
+                    </div>
+                    <div class="director-progress-track">
+                        <div class="director-progress-fill" style="width:78.4%;"></div>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; font-size:0.72rem; color:#64748b; font-family:var(--font-mono);">
+                        <span>当前: 第4章 建设中国特色社会主义总依据</span>
+                        <span>00:14:28 / 00:18:25</span>
+                    </div>
+                </div>
+                <div class="director-task-card" style="opacity:0.75;">
+                    <div class="director-task-top">
+                        <b style="font-size:0.85rem;">大学英语(三) · 综合教程</b>
+                        <span style="color:#64748b; font-family:var(--font-mono); font-size:0.75rem;">35.0% (QUEUED)</span>
+                    </div>
+                    <div class="director-progress-track">
+                        <div class="director-progress-fill" style="width:35%; background:#475569;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+</body>
+</html>

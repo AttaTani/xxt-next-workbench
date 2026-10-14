@@ -1,0 +1,2035 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>学习通 多租户智能并发挂机工作台</title>
+    <style>
+        :root {
+            /* 1. 现代冷黑基础阶 (Modern Zinc/Slate Foundation) */
+            --xxt-bg-base: #090a0f;
+            --xxt-bg-card: #11141c;
+            --xxt-bg-card-hover: #161a24;
+            --xxt-bg-card-subtle: #0d1017;
+
+            /* 2. 现代微边框体系 (Hairline Borders) */
+            --xxt-border-subtle: rgba(255, 255, 255, 0.08);
+            --xxt-border-medium: rgba(255, 255, 255, 0.14);
+            --xxt-border-focus: #0284c7;
+
+            /* 3. 文本色彩阶 */
+            --xxt-text-main: #f8fafc;
+            --xxt-text-primary: #f8fafc;
+            --xxt-text-secondary: #94a3b8;
+            --xxt-text-muted: #64748b;
+
+            /* 4. 业务主色与语义信号色 (Sky & Signals) */
+            --xxt-primary: #0284c7;
+            --xxt-primary-hover: #0369a1;
+            --xxt-primary-glow: rgba(2, 132, 199, 0.15);
+            --xxt-signal-cyan: #0284c7;
+            --xxt-signal-emerald: #10b981;
+            --xxt-signal-amber: #f59e0b;
+            --xxt-signal-rose: #ef4444;
+            --xxt-signal-violet: #8b5cf6;
+
+            /* 5. 兼容历史既有类选择器的别名 (Legacy Aliases) */
+            --bg: var(--xxt-bg-base);
+            --xxt-bg-core: var(--xxt-bg-base);
+            --xxt-surface-1: var(--xxt-bg-card);
+            --xxt-surface-2: var(--xxt-bg-card-subtle);
+            --xxt-surface-3: var(--xxt-bg-card-hover);
+            --card: var(--xxt-bg-card);
+            --card-sub: var(--xxt-bg-card-subtle);
+            --border: var(--xxt-border-subtle);
+            --border-highlight: var(--xxt-primary);
+            --text: var(--xxt-text-main);
+            --text-dim: var(--xxt-text-secondary);
+            --primary: var(--xxt-primary);
+            --primary-hover: var(--xxt-primary-hover);
+            --success: var(--xxt-signal-emerald);
+            --warning: var(--xxt-signal-amber);
+            --danger: var(--xxt-signal-rose);
+            --purple: var(--xxt-signal-violet);
+
+            /* 6. 几何圆角与阴影 */
+            --radius-xs: 4px;
+            --radius-sm: 6px;
+            --radius-md: 8px;
+            --radius-lg: 12px;
+            --radius-full: 9999px;
+
+            --shadow-subtle: 0 2px 8px rgba(0, 0, 0, 0.2);
+            --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.25);
+            --shadow-modal: 0 24px 48px -12px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.1);
+
+            /* 7. 字体与排版标准 */
+            --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+            --font-mono: "JetBrains Mono", Consolas, "Courier New", monospace;
+
+            /* 8. 动效曲线与响应 */
+            --ease-out-cubic: cubic-bezier(0.16, 1, 0.3, 1);
+            --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-fast: 150ms var(--ease-out-cubic);
+            --transition-normal: 200ms var(--ease-out-cubic);
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        /* 全局滚动条高工效微质感 */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(9, 10, 15, 0.6);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.12);
+            border-radius: var(--radius-full);
+            transition: background var(--transition-fast);
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.25);
+        }
+
+        /* 选中高亮 */
+        ::selection {
+            background: rgba(2, 132, 199, 0.35);
+            color: #ffffff;
+        }
+
+        body {
+            font-family: var(--font-sans);
+            background: var(--xxt-bg-base);
+            background-image: radial-gradient(1200px circle at 50% 0px, rgba(255, 255, 255, 0.02) 0%, transparent 70%);
+            color: var(--xxt-text-main);
+            padding: 20px 24px;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+            text-rendering: optimizeLegibility;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        .container {
+            width: 100%;
+            max-width: 1440px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        /* 等宽稳固排版工具类 (解决 1s 轮询水平抖动) */
+        .tabular-nums {
+            font-family: var(--font-mono);
+            font-variant-numeric: tabular-nums lining-nums;
+        }
+        
+        /* 顶部导航与战术态势舱 (Header Telemetry HUD) */
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 22px;
+            background: var(--xxt-surface-1);
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--xxt-border-subtle);
+            box-shadow: var(--shadow-card);
+            flex-wrap: wrap;
+            gap: 14px;
+            position: relative;
+            overflow: hidden;
+        }
+        header::before {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(6, 182, 212, 0.4), transparent);
+        }
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .header-icon-box {
+            width: 38px;
+            height: 38px;
+            border-radius: var(--radius-md);
+            background: linear-gradient(135deg, rgba(6, 182, 212, 0.15) 0%, rgba(139, 92, 246, 0.15) 100%);
+            border: 1px solid rgba(6, 182, 212, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 16px rgba(6, 182, 212, 0.2);
+            flex-shrink: 0;
+        }
+        .header-icon-box svg {
+            width: 20px;
+            height: 20px;
+            color: var(--xxt-signal-cyan);
+        }
+        .header-title-wrap {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        h1 {
+            font-size: 1.18rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            letter-spacing: -0.01em;
+            color: #ffffff;
+        }
+        .header-version-pill {
+            font-size: 0.68rem;
+            padding: 1px 6px;
+            border-radius: var(--radius-full);
+            background: rgba(6, 182, 212, 0.15);
+            color: var(--xxt-signal-cyan);
+            border: 1px solid rgba(6, 182, 212, 0.3);
+            font-family: var(--font-mono);
+            font-weight: 500;
+        }
+        .header-tags {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+            margin-top: 4px;
+        }
+        .network-tag {
+            font-size: 0.76rem;
+            padding: 3px 9px;
+            border-radius: var(--radius-full);
+            background: rgba(16, 185, 129, 0.08);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            color: #6ee7b7;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-family: var(--font-mono);
+        }
+        .network-tag.engine-tag {
+            background: rgba(139, 92, 246, 0.08);
+            border-color: rgba(139, 92, 246, 0.22);
+            color: #c4b5fd;
+            font-family: var(--font-sans);
+        }
+        .network-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #10b981;
+            box-shadow: 0 0 8px #10b981;
+            animation: pulse-ring 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse-ring {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.45; transform: scale(1.15); }
+        }
+
+        /* 全局调度控制总线 (Scheduler Matrix Bar) */
+        .toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 20px;
+            background: var(--xxt-surface-1);
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--xxt-border-subtle);
+            box-shadow: var(--shadow-card);
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .toolbar-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+        .concurrency-picker {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.82rem;
+            color: var(--xxt-text-secondary);
+        }
+        .concurrency-picker select {
+            background: var(--xxt-surface-2);
+            color: var(--xxt-text-primary);
+            border: 1px solid var(--xxt-border-subtle);
+            padding: 5px 10px;
+            border-radius: var(--radius-sm);
+            font-size: 0.82rem;
+            outline: none;
+            cursor: pointer;
+        }
+        .stats-badge-group {
+            display: flex;
+            gap: 8px;
+            font-size: 0.78rem;
+        }
+        .stat-badge {
+            padding: 4px 10px;
+            border-radius: var(--radius-full);
+            background: var(--xxt-surface-2);
+            border: 1px solid var(--xxt-border-subtle);
+            color: var(--xxt-text-secondary);
+            font-family: var(--font-mono);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all var(--transition-fast);
+        }
+        .stat-badge.running {
+            background: rgba(16, 185, 129, 0.12);
+            border-color: rgba(16, 185, 129, 0.4);
+            color: #6ee7b7;
+            font-weight: 600;
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.15);
+        }
+        .toolbar-right { display: flex; gap: 8px; }
+
+        /* 现代账号管理卡片 (Modern Account Items) */
+        .account-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-height: 280px;
+            overflow-y: auto;
+            padding-right: 2px;
+        }
+        .account-card {
+            background: var(--xxt-bg-card-subtle);
+            border: 1px solid var(--xxt-border-subtle);
+            border-radius: var(--radius-md);
+            padding: 11px 13px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            transition: all var(--transition-fast);
+            position: relative;
+            border-left: 3px solid #475569;
+        }
+        .account-card:hover {
+            border-color: var(--xxt-border-medium);
+            background: var(--xxt-bg-card-hover);
+        }
+        .account-card.logged {
+            border-left-color: var(--xxt-signal-emerald);
+        }
+        .account-card.logging {
+            border-left-color: var(--xxt-signal-amber);
+        }
+        .account-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+        .account-identity {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .account-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: var(--radius-sm);
+            background: linear-gradient(135deg, #1e293b, #334155);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: #f1f5f9;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            flex-shrink: 0;
+            text-transform: uppercase;
+        }
+        .account-card.logged .account-avatar {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.3), rgba(6, 182, 212, 0.3));
+            border-color: rgba(16, 185, 129, 0.4);
+            color: #6ee7b7;
+        }
+        .account-title {
+            font-size: 0.88rem;
+            font-weight: 600;
+            color: var(--xxt-text-primary);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .account-realname {
+            font-size: 0.75rem;
+            color: var(--xxt-signal-cyan);
+            font-weight: 500;
+            background: rgba(6, 182, 212, 0.12);
+            padding: 1px 6px;
+            border-radius: var(--radius-xs);
+            border: 1px solid rgba(6, 182, 212, 0.25);
+        }
+        .account-desc {
+            font-size: 0.77rem;
+            color: var(--xxt-text-secondary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 2px;
+        }
+        .account-task-count {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            color: var(--xxt-text-muted);
+        }
+        .account-task-count b {
+            color: var(--xxt-text-primary);
+            font-family: var(--font-mono);
+        }
+        .account-actions {
+            display: flex;
+            gap: 6px;
+            justify-content: flex-end;
+            margin-top: 4px;
+        }
+
+        /* 标签与徽章 */
+        .account-pill-badge {
+            font-size: 0.72rem;
+            padding: 2px 7px;
+            border-radius: var(--radius-xs);
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: var(--xxt-text-secondary);
+            font-weight: 500;
+        }
+
+        /* 现代化两栏主布局 (65% 主操作区 + 35% 辅助监视区) */
+        .workspace-grid {
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: 20px;
+            align-items: start;
+        }
+        @media (max-width: 1024px) {
+            .workspace-grid { grid-template-columns: 1fr; }
+        }
+
+        .card {
+            background: var(--xxt-bg-card);
+            border: 1px solid var(--xxt-border-subtle);
+            border-radius: var(--radius-lg);
+            padding: 18px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            box-shadow: var(--shadow-card);
+            position: relative;
+            transition: border-color var(--transition-fast);
+        }
+        .card:hover {
+            border-color: var(--xxt-border-medium);
+        }
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .card-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--xxt-text-main);
+        }
+
+        /* 分段药丸切换器 (Segmented Pill Switcher) */
+        .tabs {
+            display: inline-flex;
+            background: var(--xxt-bg-card-subtle);
+            padding: 3px;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--xxt-border-subtle);
+            gap: 4px;
+            align-self: flex-start;
+        }
+        .tab-btn {
+            padding: 5px 14px;
+            font-size: 0.8rem;
+            color: var(--xxt-text-secondary);
+            cursor: pointer;
+            border-radius: var(--radius-sm);
+            transition: all var(--transition-fast);
+            border: none;
+            font-weight: 500;
+            user-select: none;
+        }
+        .tab-btn:hover {
+            color: var(--xxt-text-main);
+        }
+        .tab-btn.active {
+            background: var(--xxt-primary);
+            color: #ffffff;
+            font-weight: 600;
+        }
+
+        /* 表单输入控件高工效美学 */
+        .form-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        input, select, textarea {
+            font-family: inherit;
+            background: var(--xxt-bg-card-subtle);
+            border: 1px solid var(--xxt-border-subtle);
+            color: var(--xxt-text-main);
+            padding: 9px 13px;
+            border-radius: var(--radius-md);
+            font-size: 0.85rem;
+            outline: none;
+            transition: all var(--transition-fast);
+        }
+        input::placeholder, textarea::placeholder {
+            color: var(--xxt-text-muted);
+        }
+        input:focus, select:focus, textarea:focus {
+            border-color: var(--xxt-primary);
+            box-shadow: 0 0 0 2px var(--xxt-primary-glow);
+            background: var(--xxt-bg-card);
+        }
+        select {
+            cursor: pointer;
+            padding-right: 28px;
+        }
+        textarea {
+            resize: vertical;
+            min-height: 72px;
+            font-family: var(--font-mono);
+            line-height: 1.45;
+        }
+
+        /* 现代化按钮体系 (Modern Button System) */
+        button {
+            font-family: inherit;
+            padding: 7px 15px;
+            border-radius: var(--radius-md);
+            border: 1px solid transparent;
+            font-size: 0.84rem;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            font-weight: 600;
+            user-select: none;
+            white-space: nowrap;
+        }
+        button:active {
+            transform: scale(0.98);
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+        .btn-primary {
+            background: var(--xxt-primary);
+            color: #ffffff;
+            border-color: rgba(255, 255, 255, 0.12);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+        }
+        .btn-primary:hover {
+            background: var(--xxt-primary-hover);
+            color: #ffffff;
+            box-shadow: 0 2px 8px rgba(2, 132, 199, 0.35);
+        }
+        .btn-secondary {
+            background: var(--xxt-bg-card-subtle);
+            color: var(--xxt-text-secondary);
+            border-color: var(--xxt-border-subtle);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+        }
+        .btn-secondary:hover {
+            background: var(--xxt-bg-card-hover);
+            border-color: var(--xxt-border-medium);
+            color: var(--xxt-text-main);
+        }
+        .btn-danger {
+            background: rgba(239, 68, 68, 0.1);
+            color: #fca5a5;
+            border-color: rgba(239, 68, 68, 0.2);
+        }
+        .btn-danger:hover {
+            background: rgba(239, 68, 68, 0.2);
+            border-color: rgba(239, 68, 68, 0.35);
+            color: #ffffff;
+        }
+        .btn-ghost {
+            background: transparent;
+            color: var(--xxt-text-secondary);
+            border: 1px solid transparent;
+        }
+        .btn-ghost:hover {
+            background: rgba(255, 255, 255, 0.06);
+            color: var(--xxt-text-main);
+        }
+        .btn-sm {
+            padding: 4px 9px;
+            font-size: 0.76rem;
+            border-radius: var(--radius-sm);
+        }
+
+        /* 任务看板列表 (Modern Task Kanban Queue) */
+        .task-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            max-height: 520px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+        .task-card {
+            background: var(--xxt-bg-card-subtle);
+            border: 1px solid var(--xxt-border-subtle);
+            border-radius: var(--radius-md);
+            padding: 14px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            position: relative;
+            border-left: 3px solid #334155;
+            box-shadow: var(--shadow-subtle);
+        }
+        .task-card:hover {
+            border-color: var(--xxt-border-medium);
+            background: var(--xxt-bg-card-hover);
+            transform: translateY(-1px);
+        }
+        .task-card.selected {
+            border-color: var(--xxt-primary);
+            border-left-color: var(--xxt-primary);
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+            background: var(--xxt-bg-card-hover);
+        }
+        .task-card.status-card-RUNNING {
+            border-left-color: var(--xxt-signal-emerald);
+        }
+        .task-card.status-card-QUEUED {
+            border-left-color: var(--xxt-signal-amber);
+        }
+        .task-card.status-card-PAUSED {
+            border-left-color: #64748b;
+        }
+        .task-card.status-card-COMPLETED {
+            border-left-color: #8b5cf6;
+        }
+        .task-card.status-card-ERROR {
+            border-left-color: var(--xxt-signal-rose);
+        }
+        .task-top-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+        .task-name-wrap {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            overflow: hidden;
+            flex: 1;
+        }
+        .task-name {
+            font-weight: 600;
+            font-size: 0.92rem;
+            color: var(--xxt-text-primary);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            letter-spacing: -0.01em;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .task-unit {
+            font-size: 0.8rem;
+            color: var(--xxt-text-secondary);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .task-rate-badge {
+            font-size: 0.72rem;
+            padding: 2px 7px;
+            border-radius: var(--radius-xs);
+            background: rgba(255, 255, 255, 0.06);
+            color: var(--xxt-text-secondary);
+            font-family: var(--font-mono);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            font-weight: 600;
+        }
+
+        /* 现代状态徽章 (Modern Status Badges) */
+        .status-badge {
+            font-size: 0.72rem;
+            padding: 2.5px 8px;
+            border-radius: var(--radius-sm);
+            font-weight: 600;
+            white-space: nowrap;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-family: var(--font-mono);
+            letter-spacing: 0.02em;
+        }
+        .status-RUNNING {
+            background: rgba(16, 185, 129, 0.12);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.25);
+        }
+        .status-QUEUED {
+            background: rgba(245, 158, 11, 0.12);
+            color: #fbbf24;
+            border: 1px solid rgba(245, 158, 11, 0.25);
+        }
+        .status-PAUSED {
+            background: rgba(148, 163, 184, 0.12);
+            color: #94a3b8;
+            border: 1px solid rgba(148, 163, 184, 0.2);
+        }
+        .status-COMPLETED {
+            background: rgba(139, 92, 246, 0.12);
+            color: #c4b5fd;
+            border: 1px solid rgba(139, 92, 246, 0.25);
+        }
+        .status-ERROR {
+            background: rgba(239, 68, 68, 0.12);
+            color: #fca5a5;
+            border: 1px solid rgba(239, 68, 68, 0.25);
+        }
+        .status-LOGGED_IN {
+            background: rgba(16, 185, 129, 0.12);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.25);
+        }
+        .status-NEED_LOGIN {
+            background: rgba(245, 158, 11, 0.12);
+            color: #fbbf24;
+            border: 1px solid rgba(245, 158, 11, 0.25);
+        }
+        .status-LOGGING_IN {
+            background: rgba(2, 132, 199, 0.12);
+            color: #38bdf8;
+            border: 1px solid rgba(2, 132, 199, 0.25);
+        }
+        .status-IDLE {
+            background: rgba(100, 116, 139, 0.15);
+            color: #94a3b8;
+            border: 1px solid rgba(100, 116, 139, 0.25);
+        }
+
+        /* 现代化双色平滑进度条 */
+        .progress-bar-bg {
+            width: 100%;
+            height: 7px;
+            background: rgba(255, 255, 255, 0.06);
+            border-radius: var(--radius-full);
+            overflow: hidden;
+            position: relative;
+        }
+        .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #0284c7 0%, #10b981 100%);
+            border-radius: var(--radius-full);
+            transition: width 0.35s ease;
+        }
+        .task-progress-text {
+            font-size: 0.74rem;
+            color: var(--xxt-text-secondary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .task-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 6px;
+            margin-top: 4px;
+            flex-wrap: wrap;
+        }
+
+        /* 实时屏幕监控视口 (Live Screen Viewport with CRT) */
+        .preview-container {
+            width: 100%;
+            height: 230px;
+            background: #040508;
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid var(--xxt-border-subtle);
+            position: relative;
+            box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.8);
+        }
+        .preview-container::after {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(rgba(18, 25, 40, 0) 50%, rgba(0, 0, 0, 0.3) 50%);
+            background-size: 100% 4px;
+            pointer-events: none;
+            opacity: 0.65;
+            z-index: 5;
+        }
+        .preview-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+        }
+        .preview-top-hud {
+            position: absolute;
+            top: 8px;
+            left: 10px;
+            right: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            pointer-events: none;
+            z-index: 10;
+        }
+        .preview-hud-tag {
+            background: rgba(9, 11, 16, 0.85);
+            backdrop-filter: blur(4px);
+            padding: 3px 8px;
+            border-radius: var(--radius-sm);
+            font-size: 0.72rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #10b981;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-family: var(--font-mono);
+            font-weight: 600;
+            pointer-events: auto;
+        }
+        .preview-overlay {
+            position: absolute;
+            bottom: 8px;
+            left: 10px;
+            right: 10px;
+            background: rgba(9, 11, 16, 0.85);
+            backdrop-filter: blur(4px);
+            padding: 4px 10px;
+            border-radius: var(--radius-sm);
+            font-size: 0.72rem;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            z-index: 10;
+            color: var(--xxt-text-secondary);
+        }
+        .preview-zoom-btn {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: var(--xxt-text-main);
+            padding: 2px 7px;
+            border-radius: var(--radius-xs);
+            font-size: 0.72rem;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .preview-zoom-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: var(--xxt-primary);
+            color: #ffffff;
+        }
+
+        /* 结构化日志终端控制台 (Terminal Stream Console) */
+        .log-terminal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .log-controls {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .log-box {
+            height: 190px;
+            background: #06070a;
+            border-radius: var(--radius-md);
+            padding: 10px 14px;
+            font-family: var(--font-mono);
+            font-size: 0.74rem;
+            overflow-y: auto;
+            border: 1px solid var(--xxt-border-subtle);
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            line-height: 1.45;
+        }
+        .log-entry {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+            color: #cbd5e1;
+            word-break: break-all;
+        }
+        .log-time {
+            color: var(--xxt-text-muted);
+            font-size: 0.72rem;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+        .log-tag-badge {
+            font-size: 0.68rem;
+            padding: 1px 5px;
+            border-radius: var(--radius-xs);
+            white-space: nowrap;
+            flex-shrink: 0;
+            font-weight: 500;
+        }
+        .log-tag-task { background: rgba(6, 182, 212, 0.12); color: #67e8f9; border: 1px solid rgba(6, 182, 212, 0.25); }
+        .log-tag-ai { background: rgba(139, 92, 246, 0.18); color: #d8b4fe; border: 1px solid rgba(139, 92, 246, 0.35); font-weight: 600; }
+        .log-tag-warn { background: rgba(245, 158, 11, 0.15); color: #fde047; border: 1px solid rgba(245, 158, 11, 0.3); }
+        .log-tag-error { background: rgba(244, 63, 94, 0.18); color: #fda4af; border: 1px solid rgba(244, 63, 94, 0.35); font-weight: 600; }
+        .log-tag-info { background: rgba(255, 255, 255, 0.06); color: #94a3b8; border: 1px solid rgba(255, 255, 255, 0.1); }
+        .log-text { color: var(--xxt-text-primary); flex: 1; }
+
+        /* 全局轻量 Toast 浮动通知 */
+        #toastContainer {
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 9999;
+            pointer-events: none;
+        }
+        .toast-item {
+            background: var(--xxt-surface-1);
+            border: 1px solid var(--xxt-border-medium);
+            padding: 10px 16px;
+            border-radius: var(--radius-md);
+            font-size: 0.82rem;
+            color: var(--xxt-text-primary);
+            box-shadow: var(--shadow-modal);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            backdrop-filter: blur(12px);
+            pointer-events: auto;
+            animation: toast-in 0.25s var(--ease-out-cubic);
+            transition: all var(--transition-normal);
+        }
+        @keyframes toast-in {
+            from { opacity: 0; transform: translateX(20px) scale(0.95); }
+            to { opacity: 1; transform: translateX(0) scale(1); }
+        }
+        .toast-item.toast-success { border-left: 3.5px solid var(--xxt-signal-emerald); }
+        .toast-item.toast-error { border-left: 3.5px solid var(--xxt-signal-rose); }
+        .toast-item.toast-warn { border-left: 3.5px solid var(--xxt-signal-amber); }
+
+        /* 模态框体系 (Glassmorphism Modal System) */
+        .modal {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(9, 13, 22, 0.78);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            padding: 20px;
+        }
+        .modal-content {
+            background: var(--xxt-surface-1);
+            border: 1px solid var(--xxt-border-medium);
+            border-radius: var(--radius-lg);
+            padding: 26px 28px;
+            max-width: 420px;
+            width: 100%;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            align-items: center;
+            box-shadow: var(--shadow-modal);
+            position: relative;
+            animation: modal-enter 0.22s var(--ease-out-cubic);
+        }
+        @keyframes modal-enter {
+            from { opacity: 0; transform: scale(0.94) translateY(8px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .qr-img {
+            max-width: 220px;
+            width: 100%;
+            border-radius: var(--radius-md);
+            background: #ffffff;
+            padding: 10px;
+            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 现代化顶栏 -->
+        <header>
+            <div class="header-brand">
+                <div class="header-icon-box">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                    </svg>
+                </div>
+                <div class="header-title-wrap">
+                    <h1>
+                        <span>学习通智能挂机控制台</span>
+                    </h1>
+                    <div class="header-tags">
+                        <div class="network-tag">
+                            <span class="network-dot"></span>
+                            <span id="headerIpStatus">出口 IP: 120.235.237.125 (广东家宽直连)</span>
+                        </div>
+                        <div class="network-tag engine-tag">
+                            <span style="color:var(--xxt-signal-emerald);">●</span>
+                            <span>多租户会话隔离已就绪</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <div id="globalStatusBadge" class="status-badge status-QUEUED">服务就绪</div>
+            </div>
+        </header>
+
+        <!-- 全局并发调度控制栏 -->
+        <div class="toolbar">
+            <div class="toolbar-left">
+                <div class="concurrency-picker">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--xxt-primary)" stroke-width="2">
+                        <rect x="4" y="4" width="16" height="16" rx="2"></rect>
+                        <rect x="9" y="9" width="6" height="6"></rect>
+                        <line x1="9" y1="1" x2="9" y2="4"></line>
+                        <line x1="15" y1="1" x2="15" y2="4"></line>
+                        <line x1="9" y1="20" x2="9" y2="23"></line>
+                        <line x1="15" y1="20" x2="15" y2="23"></line>
+                        <line x1="20" y1="9" x2="23" y2="9"></line>
+                        <line x1="20" y1="15" x2="23" y2="15"></line>
+                        <line x1="1" y1="9" x2="4" y2="9"></line>
+                        <line x1="1" y1="15" x2="4" y2="15"></line>
+                    </svg>
+                    <span>并发线程:</span>
+                    <select id="concurrencySelect" onchange="changeConcurrency(this.value)">
+                        <option value="1">1 线程 (单任务·省流)</option>
+                        <option value="2">2 线程 (双任务·推荐)</option>
+                        <option value="3">3 线程 (三任务·极速)</option>
+                        <option value="4">4 线程 (高负荷模式)</option>
+                    </select>
+                </div>
+                <div class="stats-badge-group">
+                    <div class="stat-badge running tabular-nums" id="statRunning">运行中: 0</div>
+                    <div class="stat-badge tabular-nums" id="statQueued">排队中: 0</div>
+                    <div class="stat-badge tabular-nums" id="statTotal">总任务: 0</div>
+                </div>
+            </div>
+            <div class="toolbar-right">
+                <button class="btn-primary btn-sm" onclick="startAllTasks()">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                    <span>全部启动</span>
+                </button>
+                <button class="btn-secondary btn-sm" onclick="stopAllTasks()">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                        <rect x="6" y="4" width="4" height="16"></rect>
+                        <rect x="14" y="4" width="4" height="16"></rect>
+                    </svg>
+                    <span>全部暂停</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- 双栏工作台 -->
+        <div class="workspace-grid">
+            <!-- 左栏：任务创建器 & 任务看板 -->
+            <div style="display: flex; flex-direction: column; gap: 16px;">
+                <!-- 录入挂机课程任务卡片 -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--xxt-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <line x1="12" y1="8" x2="12" y2="16"></line>
+                                <line x1="8" y1="12" x2="16" y2="12"></line>
+                            </svg>
+                            <span>添加挂机课程</span>
+                        </div>
+                        <span style="font-size: 0.75rem; color: var(--xxt-text-muted);">支持超星课程详情页链接</span>
+                    </div>
+                    <div class="tabs">
+                        <div class="tab-btn active" id="tabSingleBtn" onclick="switchCreateTab('single')">单课程录入</div>
+                        <div class="tab-btn" id="tabBatchBtn" onclick="switchCreateTab('batch')">批量粘贴导入</div>
+                    </div>
+
+                    <!-- 单任务表单 -->
+                    <div id="singleCreateForm" style="display: flex; flex-direction: column; gap: 12px; margin-top: 4px;">
+                        <div class="form-row">
+                            <span style="font-size: 0.8rem; color: var(--xxt-text-secondary); white-space: nowrap;">挂载账号:</span>
+                            <select id="singleAccountSelect" style="flex: 1;"></select>
+                        </div>
+                        <input type="text" id="singleUrl" placeholder="粘贴学习通课程大纲页或播放页链接 (包含 courseId 与 clazzid)..." />
+                        <div class="form-row">
+                            <input type="text" id="singleName" placeholder="课程别名 (留空则自动抓取大纲标题)" style="flex: 1;" />
+                            <select id="singleRate" style="width: 140px;">
+                                <option value="1">1.0x 正常速度</option>
+                                <option value="1.25">1.25x 轻度加速</option>
+                                <option value="1.5" selected>1.5x 推荐倍速</option>
+                                <option value="2">2.0x 极速模式</option>
+                            </select>
+                            <button class="btn-primary" onclick="createSingleTask()">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                </svg>
+                                <span>添加任务</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 批量任务表单 -->
+                    <div id="batchCreateForm" style="display: none; flex-direction: column; gap: 12px; margin-top: 4px;">
+                        <div class="form-row">
+                            <span style="font-size: 0.8rem; color: var(--xxt-text-secondary); white-space: nowrap;">挂载账号:</span>
+                            <select id="batchAccountSelect" style="flex: 1;"></select>
+                        </div>
+                        <textarea id="batchUrls" placeholder="每行粘贴一个课程链接，支持一次性批量导入 5~10 门课:&#10;https://mooc1.chaoxing.com/mycourse/studentcourse?courseId=1...&#10;https://mooc1.chaoxing.com/mycourse/studentcourse?courseId=2..."></textarea>
+                        <div class="form-row" style="justify-content: flex-end;">
+                            <select id="batchRate" style="width: 140px;">
+                                <option value="1">1.0x 正常速度</option>
+                                <option value="1.25">1.25x 轻度加速</option>
+                                <option value="1.5" selected>1.5x 推荐倍速</option>
+                                <option value="2">2.0x 极速模式</option>
+                            </select>
+                            <button class="btn-primary" onclick="createBatchTasks()">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                    <polyline points="14 2 14 8 20 8"></polyline>
+                                    <line x1="12" y1="18" x2="12" y2="12"></line>
+                                    <line x1="9" y1="15" x2="15" y2="15"></line>
+                                </svg>
+                                <span>批量导入队列</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 任务看板列表 -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--xxt-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="3" width="7" height="9"></rect>
+                                <rect x="14" y="3" width="7" height="5"></rect>
+                                <rect x="14" y="12" width="7" height="9"></rect>
+                                <rect x="3" y="16" width="7" height="5"></rect>
+                            </svg>
+                            <span>挂机任务看板</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="font-size: 0.78rem; color: var(--xxt-text-secondary);">账号筛选:</span>
+                            <select id="taskAccountFilter" style="padding: 3px 10px; font-size: 0.76rem;" onchange="renderTaskList()">
+                                <option value="all">显示全部账户任务</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="task-list" id="taskListView">
+                        <div style="text-align: center; color: var(--xxt-text-secondary); padding: 32px;">正在加载任务队列...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右栏：实时屏幕监控、账号管理、实时日志 -->
+            <div style="display: flex; flex-direction: column; gap: 16px;">
+                <!-- 实时做题屏幕监控 -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--xxt-signal-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                                <line x1="8" y1="21" x2="16" y2="21"></line>
+                                <line x1="12" y1="17" x2="12" y2="21"></line>
+                            </svg>
+                            <span>实时做题屏幕监控</span>
+                        </div>
+                        <span id="previewTaskTitle" style="font-size: 0.78rem; color: var(--xxt-signal-cyan); font-family: var(--font-mono); font-weight: 500;">默认视口</span>
+                    </div>
+                    <div class="preview-container">
+                        <div class="preview-top-hud">
+                            <div class="preview-hud-tag">
+                                <span class="network-dot" style="width:6px;height:6px;"></span>
+                                <span>LIVE STREAM</span>
+                            </div>
+                            <div class="preview-hud-tag tabular-nums" id="previewFpsBadge">1280x720 · 实时画面</div>
+                        </div>
+                        <img id="livePreviewImg" src="/api/screen.png" alt="无头浏览器实时画面" />
+                        <div class="preview-overlay">
+                            <div style="display:flex; align-items:center; gap:6px; overflow:hidden;">
+                                <span class="network-dot" style="width:6px;height:6px;flex-shrink:0;"></span>
+                                <span id="previewProgressBadge" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-family:var(--font-mono);">就绪检测中...</span>
+                            </div>
+                            <button class="preview-zoom-btn" onclick="openPreviewZoomModal()">
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+                                <span>全景</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 超星账号管理 (垂直紧凑卡片流) -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--xxt-signal-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="9" cy="7" r="4"></circle>
+                                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                            </svg>
+                            <span>超星账号管理</span>
+                        </div>
+                        <button class="btn-primary btn-sm" onclick="openCreateAccountModal()">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                            </svg>
+                            <span>添加账号</span>
+                        </button>
+                    </div>
+                    <div class="account-grid" id="accountCardsView">
+                        <div style="color: var(--xxt-text-secondary); font-size: 0.85rem; padding: 12px; text-align: center;">正在加载账号列表...</div>
+                    </div>
+                </div>
+
+                <!-- 实时运行日志 -->
+                <div class="card">
+                    <div class="card-header log-terminal-header">
+                        <div class="card-title">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--xxt-signal-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="4 17 10 11 4 5"></polyline>
+                                <line x1="12" y1="19" x2="20" y2="19"></line>
+                            </svg>
+                            <span>实时运行日志</span>
+                        </div>
+                        <div class="log-controls">
+                            <select id="logFilterSelect" style="padding: 2px 8px; font-size: 0.74rem;" onchange="renderLogs()">
+                                <option value="all">全部任务</option>
+                                <option value="selected">仅当前选中</option>
+                            </select>
+                            <select id="logLevelSelect" style="padding: 2px 8px; font-size: 0.74rem;" onchange="renderLogs()">
+                                <option value="all">全级别</option>
+                                <option value="ai">仅 AI 答题</option>
+                                <option value="warn">仅警告/风控</option>
+                                <option value="error">仅报错</option>
+                            </select>
+                            <button class="btn-secondary btn-sm" id="btnScrollLock" onclick="toggleScrollLock()" style="padding:2px 7px; font-size:0.72rem;">
+                                <span id="scrollLockIcon">🟢</span>
+                                <span id="scrollLockText">跟随</span>
+                            </button>
+                            <button class="btn-ghost btn-sm" onclick="clearLogsView()" style="padding:2px 7px; font-size:0.72rem;">清屏</button>
+                        </div>
+                    </div>
+                    <div class="log-box" id="logBoxView">
+                        <div class="log-entry"><span class="log-time">--:--:--</span> <span class="log-text" style="color:var(--xxt-text-secondary);">正在连接后台日志流...</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 全局 Toast 容器 -->
+    <div id="toastContainer"></div>
+
+    <!-- 3. 画面放大监视全景模态框 -->
+    <div id="previewZoomModal" class="modal" onclick="closePreviewZoomModal()">
+        <div class="modal-content" style="max-width:960px; width:95%; padding:18px;" onclick="event.stopPropagation()">
+            <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+                <div style="font-weight:600; font-size:0.95rem; display:flex; align-items:center; gap:8px;">
+                    <span class="network-dot"></span>
+                    <span id="zoomModalTitle">无头浏览器实时画面放大快照</span>
+                </div>
+                <button class="btn-secondary btn-sm" onclick="closePreviewZoomModal()">关闭 ✕</button>
+            </div>
+            <div style="width:100%; max-height:75vh; overflow:auto; background:#000; border-radius:8px; display:flex; justify-content:center;">
+                <img id="zoomModalImg" src="/api/screen.png" style="max-width:100%; height:auto; object-fit:contain;" alt="全景放大画面" />
+            </div>
+        </div>
+    </div>
+
+    <!-- 1. 新建账户模态框 -->
+    <div id="createAccountModal" class="modal">
+        <div class="modal-content">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--xxt-signal-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="8.5" cy="7" r="4"></circle>
+                    <line x1="20" y1="8" x2="20" y2="14"></line>
+                    <line x1="23" y1="11" x2="17" y2="11"></line>
+                </svg>
+                <h3 style="font-size: 1.05rem; font-weight: 600;">添加超星独立账户</h3>
+            </div>
+            <p style="font-size: 0.8rem; color: var(--xxt-text-secondary); line-height: 1.45;">
+                为新学生或不同学号建立完全独立的隔离上下文，Cookies 与存储指纹零串扰：
+            </p>
+            <input type="text" id="newAccountNameInput" placeholder="输入账户备注名 (如: 李四 / 138xxxx / 账号A)" style="width: 100%;" />
+            <div style="display: flex; gap: 10px; width: 100%; justify-content: flex-end;">
+                <button class="btn-secondary btn-sm" onclick="closeCreateAccountModal()">取消</button>
+                <button class="btn-primary btn-sm" onclick="submitCreateAccount()">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    <span>确认添加</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. 专属扫码登录模态框 -->
+    <div id="accountQrModal" class="modal">
+        <div class="modal-content">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--xxt-signal-cyan)" stroke-width="2">
+                    <rect x="3" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="14" width="7" height="7"></rect>
+                    <rect x="3" y="14" width="7" height="7"></rect>
+                </svg>
+                <h3 style="font-size: 1.05rem; font-weight: 600;" id="qrModalTitle">超星 App 扫码登录</h3>
+            </div>
+            <p style="font-size: 0.8rem; color: var(--xxt-text-secondary); line-height: 1.45;" id="qrModalDesc">
+                请使用学习通 App 扫码授权，成功后将自动同步会话与个人档案：
+            </p>
+            <div style="position: relative; display: inline-flex;">
+                <img id="accountQrImg" class="qr-img" src="/api/qrcode.png" alt="登录二维码" />
+            </div>
+            <div style="font-size: 0.78rem; color: var(--xxt-signal-emerald); display: flex; align-items: center; gap: 6px; font-family: var(--font-mono);" id="qrStatusPrompt">
+                <span class="network-dot"></span>
+                <span>正在检测扫码状态...</span>
+            </div>
+            <div style="display: flex; gap: 10px; width: 100%; justify-content: center;">
+                <button class="btn-primary btn-sm" onclick="refreshCurrentAccountQr()">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="23 4 23 10 17 10"></polyline>
+                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                    </svg>
+                    <span>刷新二维码</span>
+                </button>
+                <button class="btn-secondary btn-sm" onclick="closeAccountQrModal()">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局安全鉴权拦截器 (若后端开启 Admin Token，自动附加头部并在 401 时提示)
+        const _origFetch = window.fetch;
+        window.fetch = async function(url, options = {}) {
+            options.headers = options.headers || {};
+            const token = localStorage.getItem('xxt_admin_token');
+            if (token) {
+                if (options.headers instanceof Headers) {
+                    options.headers.set('x-admin-token', token);
+                } else {
+                    options.headers['x-admin-token'] = token;
+                }
+            }
+            const res = await _origFetch(url, options);
+            if (res.status === 401 && String(url).startsWith('/api')) {
+                const inputToken = prompt('【管理安全校验】当前挂机后台已开启口令保护，请输入访问口令 (Admin Token)：');
+                if (inputToken) {
+                    localStorage.setItem('xxt_admin_token', inputToken.trim());
+                    return window.fetch(url, options);
+                }
+            }
+            return res;
+        };
+
+        let currentAccounts = [];
+        let currentTasks = [];
+        let allLogs = [];
+        let selectedTaskId = null;
+        let activeQrAccountId = null;
+        let qrPollTimer = null;
+
+        // 切换录入选项卡
+        function switchCreateTab(tab) {
+            document.getElementById('tabSingleBtn').className = tab === 'single' ? 'tab-btn active' : 'tab-btn';
+            document.getElementById('tabBatchBtn').className = tab === 'batch' ? 'tab-btn active' : 'tab-btn';
+            document.getElementById('singleCreateForm').style.display = tab === 'single' ? 'flex' : 'none';
+            document.getElementById('batchCreateForm').style.display = tab === 'batch' ? 'flex' : 'none';
+        }
+
+        // 全局状态轮询获取
+        async function fetchState() {
+            try {
+                const res = await fetch('/api/tasks');
+                if (!res.ok) return;
+                const data = await res.json();
+                currentAccounts = data.accounts || [];
+                currentTasks = data.tasks || [];
+                allLogs = data.logs || [];
+
+                // 顶栏状态指示
+                const badge = document.getElementById('globalStatusBadge');
+                badge.className = 'status-badge status-' + (data.status || 'IDLE');
+                badge.innerText = data.status === 'RUNNING' ? `挂机中 (${data.runningCount}/${data.maxConcurrent})` : (data.status === 'IDLE' ? '空闲待命' : data.status);
+
+                // 并发下拉选择器状态同步
+                const concSelect = document.getElementById('concurrencySelect');
+                if (data.maxConcurrent && String(concSelect.value) !== String(data.maxConcurrent)) {
+                    concSelect.value = String(data.maxConcurrent);
+                }
+
+                // 统计指标
+                document.getElementById('statRunning').innerText = `运行中: ${data.runningCount}`;
+                document.getElementById('statQueued').innerText = `排队中: ${currentTasks.filter(t => t.status === 'QUEUED').length}`;
+                document.getElementById('statTotal').innerText = `总任务: ${currentTasks.length}`;
+
+                // 若未指定选中任务，默认选首个运行中或第一个任务
+                if (!selectedTaskId || !currentTasks.some(t => t.id === selectedTaskId)) {
+                    const runningTask = currentTasks.find(t => t.status === 'RUNNING');
+                    selectedTaskId = runningTask ? runningTask.id : (currentTasks[0] ? currentTasks[0].id : null);
+                }
+
+                renderAccounts();
+                updateAccountSelectOptions();
+                renderTaskList();
+                renderLogs();
+                refreshPreview();
+            } catch (e) {}
+        }
+
+        // 渲染多账户卡片流 (高工效 Tenant Context Deck)
+        function renderAccounts() {
+            const container = document.getElementById('accountCardsView');
+            if (!currentAccounts || currentAccounts.length === 0) {
+                container.innerHTML = '<div style="color: var(--xxt-text-secondary); font-size: 0.85rem; padding: 12px;">暂无已配置账户，请点击上方按钮添加！</div>';
+                return;
+            }
+
+            let html = '';
+            for (const acc of currentAccounts) {
+                const isLogged = acc.status === 'LOGGED_IN';
+                const isLogging = acc.status === 'LOGGING_IN';
+                const cardClass = isLogged ? 'logged' : (isLogging ? 'logging' : '');
+                const taskCount = currentTasks.filter(t => t.accountId === acc.id).length;
+                
+                const displayName = acc.userRealName || acc.name || '超';
+                const initial = displayName.trim().slice(0, 1).toUpperCase();
+
+                let statusBadge = '';
+                if (isLogged) {
+                    statusBadge = `<span class="status-badge status-LOGGED_IN"><span class="network-dot" style="width:6px;height:6px;display:inline-block;margin-right:4px;"></span>已就绪</span>`;
+                } else if (isLogging) {
+                    statusBadge = `<span class="status-badge status-LOGGING_IN"><span class="network-dot" style="width:6px;height:6px;display:inline-block;margin-right:4px;background:#f59e0b;box-shadow:0 0 6px #f59e0b;"></span>扫码中</span>`;
+                } else {
+                    statusBadge = `<span class="status-badge status-NEED_LOGIN">未登录</span>`;
+                }
+
+                html += `
+                <div class="account-card ${cardClass}">
+                    <div class="account-top">
+                        <div class="account-identity">
+                            <div class="account-avatar">${escapeHtml(initial)}</div>
+                            <div>
+                                <div class="account-title">
+                                    <span>${escapeHtml(acc.name)}</span>
+                                    ${acc.userRealName ? `<span class="account-realname">${escapeHtml(acc.userRealName)}</span>` : ''}
+                                </div>
+                                <div style="font-size:0.73rem;color:var(--xxt-text-muted);">${escapeHtml(acc.schoolName || '超星自主平台')}</div>
+                            </div>
+                        </div>
+                        ${statusBadge}
+                    </div>
+                    <div class="account-desc">
+                        <span class="account-task-count">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                            </svg>
+                            <span>挂机负载:</span>
+                            <b class="tabular-nums">${taskCount}</b> 门课程
+                        </span>
+                        <span style="font-size:0.72rem;color:var(--xxt-signal-violet);background:rgba(139,92,246,0.1);padding:1px 6px;border-radius:4px;border:1px solid rgba(139,92,246,0.2);">会话隔离 #${escapeHtml(acc.id.replace('acc_', ''))}</span>
+                    </div>
+                    <div class="account-actions">
+                        ${isLogged 
+                            ? `<button class="btn-secondary btn-sm" onclick="openAccountQrModal('${acc.id}')">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                                <span>重新扫码</span>
+                               </button>`
+                            : `<button class="btn-primary btn-sm" onclick="openAccountQrModal('${acc.id}')">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                                <span>扫码登录</span>
+                               </button>`}
+                        ${acc.id !== 'acc_default' ? `
+                            <button class="btn-danger btn-sm" onclick="deleteAccountAction('${acc.id}')">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                                <span>删除</span>
+                            </button>` : ''}
+                    </div>
+                </div>
+                `;
+            }
+            container.innerHTML = html;
+        }
+
+        // 同步创建表单与筛选下拉框的账户列表
+        function updateAccountSelectOptions() {
+            const singleSel = document.getElementById('singleAccountSelect');
+            const batchSel = document.getElementById('batchAccountSelect');
+            const filterSel = document.getElementById('taskAccountFilter');
+
+            const currentSingleVal = singleSel.value;
+            const currentBatchVal = batchSel.value;
+            const currentFilterVal = filterSel.value;
+
+            let opts = '';
+            for (const acc of currentAccounts) {
+                const mark = acc.status === 'LOGGED_IN' ? '🟢' : '⚪';
+                opts += `<option value="${acc.id}">👤 ${escapeHtml(acc.name)} ${mark}</option>`;
+            }
+            singleSel.innerHTML = opts;
+            batchSel.innerHTML = opts;
+
+            if (currentSingleVal && currentAccounts.some(a => a.id === currentSingleVal)) singleSel.value = currentSingleVal;
+            if (currentBatchVal && currentAccounts.some(a => a.id === currentBatchVal)) batchSel.value = currentBatchVal;
+
+            let filterOpts = '<option value="all">显示全部账户任务</option>';
+            for (const acc of currentAccounts) {
+                filterOpts += `<option value="${acc.id}">仅账户: ${escapeHtml(acc.name)}</option>`;
+            }
+            filterSel.innerHTML = filterOpts;
+            if (currentFilterVal) filterSel.value = currentFilterVal;
+        }
+
+        // 渲染高工效任务看板 (Tactical Kanban Queue)
+        function renderTaskList() {
+            const listEl = document.getElementById('taskListView');
+            const filterAcc = document.getElementById('taskAccountFilter').value;
+
+            let filteredTasks = currentTasks;
+            if (filterAcc && filterAcc !== 'all') {
+                filteredTasks = currentTasks.filter(t => t.accountId === filterAcc);
+            }
+
+            if (!filteredTasks || filteredTasks.length === 0) {
+                listEl.innerHTML = '<div style="text-align: center; color: var(--xxt-text-secondary); padding: 32px; font-size: 0.85rem;">暂无该分类下的挂机任务，请在上方添加！</div>';
+                return;
+            }
+
+            let html = '';
+            for (const t of filteredTasks) {
+                const isSelected = t.id === selectedTaskId;
+                const pct = t.progress ? (t.progress.percentage || 0) : 0;
+                const unitTitle = t.progress ? (t.progress.unitTitle || '正在定位小节...') : '';
+                const timeText = t.progress && t.progress.duration > 0 ? `${t.progress.currentTime}s / ${t.progress.duration}s` : '';
+                const accName = t.accountName || '默认主账号';
+                const isAccNeedLogin = t.accountStatus === 'NEED_LOGIN';
+                const statusCardClass = `status-card-${t.status}`;
+
+                html += `
+                <div class="task-card ${isSelected ? 'selected' : ''} ${statusCardClass}" onclick="selectTask('${t.id}')">
+                    <div class="task-top-row">
+                        <div class="task-name-wrap">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--xxt-signal-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">
+                                <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+                                <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+                            </svg>
+                            <span class="task-name" title="${escapeHtml(t.name || '待识别课程')}">${escapeHtml(t.name || '待识别课程')}</span>
+                            <span class="account-pill-badge">${escapeHtml(accName)}</span>
+                            <span class="task-rate-badge">${t.playbackRate}x</span>
+                        </div>
+                        <span class="status-badge status-${t.status}">${getStatusLabel(t.status)}</span>
+                    </div>
+                    <div class="task-unit">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                        <span>当前节点:</span>
+                        <span style="color:var(--xxt-text-primary); font-weight:500;">${escapeHtml(unitTitle)}</span>
+                    </div>
+                    ${t.errorMessage ? `<div style="font-size: 0.76rem; color: var(--xxt-signal-rose); display: flex; align-items: center; gap: 4px;"><span>⚠️</span><span>${escapeHtml(t.errorMessage)}</span></div>` : ''}
+                    <div class="progress-bar-bg">
+                        <div class="progress-bar-fill" style="width: ${pct}%;"></div>
+                    </div>
+                    <div class="task-progress-text">
+                        <span class="tabular-nums">完成进度: <b style="color:var(--xxt-text-primary);">${pct}%</b></span>
+                        <span class="tabular-nums" style="color:var(--xxt-text-muted); font-size:0.72rem;">${timeText}</span>
+                    </div>
+                    <div class="task-actions" onclick="event.stopPropagation()">
+                        ${isAccNeedLogin ? `
+                            <button class="btn-primary btn-sm" onclick="openAccountQrModal('${t.accountId}')">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                                <span>立即扫码绑定</span>
+                            </button>` : ''}
+                        ${t.status === 'RUNNING' 
+                            ? `<button class="btn-secondary btn-sm" onclick="pauseTask('${t.id}')">
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+                                <span>暂停</span>
+                               </button>`
+                            : `<button class="btn-primary btn-sm" onclick="startTask('${t.id}')">
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                                <span>启动</span>
+                               </button>`}
+                        <button class="btn-secondary btn-sm" onclick="setPriority('${t.id}', 'top')">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"></polyline></svg>
+                            <span>置顶</span>
+                        </button>
+                        <button class="btn-danger btn-sm" onclick="deleteTask('${t.id}')">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                            <span>删除</span>
+                        </button>
+                    </div>
+                </div>
+                `;
+            }
+            listEl.innerHTML = html;
+        }
+
+        function getStatusLabel(s) {
+            switch(s) {
+                case 'RUNNING': return '<span class="network-dot" style="width:5px;height:5px;"></span>挂机中';
+                case 'QUEUED': return '<span class="network-dot" style="width:5px;height:5px;background:#f59e0b;box-shadow:0 0 6px #f59e0b;"></span>排队中';
+                case 'PAUSED': return '已暂停';
+                case 'COMPLETED': return '已完成';
+                case 'ERROR': return '异常中断';
+                default: return s;
+            }
+        }
+
+        function selectTask(id) {
+            selectedTaskId = id;
+            renderTaskList();
+            renderLogs();
+            refreshPreview();
+        }
+
+        let isScrollLocked = true;
+
+        // 全局微 Toast 通知组件 (代替原始 alert)
+        function showToast(msg, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            if (!container) return;
+            const item = document.createElement('div');
+            item.className = `toast-item toast-${type}`;
+            let icon = 'ℹ️';
+            if (type === 'success') icon = '✅';
+            if (type === 'error') icon = '❌';
+            if (type === 'warn') icon = '⚠️';
+            item.innerHTML = `<span>${icon}</span><span style="font-weight:500;">${escapeHtml(msg)}</span>`;
+            container.appendChild(item);
+            setTimeout(() => {
+                item.style.opacity = '0';
+                item.style.transform = 'translateY(-8px) scale(0.95)';
+                setTimeout(() => item.remove(), 250);
+            }, 3200);
+        }
+
+        // 视口全景放大模态框交互
+        function openPreviewZoomModal() {
+            const modal = document.getElementById('previewZoomModal');
+            const zoomImg = document.getElementById('zoomModalImg');
+            const liveImg = document.getElementById('livePreviewImg');
+            const zoomTitle = document.getElementById('zoomModalTitle');
+            const currentTask = currentTasks.find(t => t.id === selectedTaskId);
+            zoomTitle.innerText = currentTask ? `光学快照放大: ${currentTask.name || currentTask.id}` : '无头浏览器实时画面全景快照';
+            zoomImg.src = liveImg.src;
+            modal.style.display = 'flex';
+        }
+        function closePreviewZoomModal() {
+            document.getElementById('previewZoomModal').style.display = 'none';
+        }
+
+        // 日志滚屏跟随锁切换
+        function toggleScrollLock() {
+            isScrollLocked = !isScrollLocked;
+            const btn = document.getElementById('btnScrollLock');
+            const icon = document.getElementById('scrollLockIcon');
+            const text = document.getElementById('scrollLockText');
+            if (isScrollLocked) {
+                icon.innerText = '🟢';
+                text.innerText = '跟随';
+                btn.className = 'btn-secondary btn-sm';
+                const logBox = document.getElementById('logBoxView');
+                logBox.scrollTop = logBox.scrollHeight;
+                showToast('已开启日志自动滚屏跟随', 'info');
+            } else {
+                icon.innerText = '⏸️';
+                text.innerText = '锁定';
+                btn.className = 'btn-primary btn-sm';
+                showToast('已暂停滚屏跟随，可自由查看与复制日志', 'warn');
+            }
+        }
+
+        function clearLogsView() {
+            allLogs = [];
+            document.getElementById('logBoxView').innerHTML = '<div class="log-entry"><span class="log-time">--:--:--</span> <span class="log-text" style="color:var(--xxt-text-secondary);">日志已由用户清空</span></div>';
+            showToast('已清空当前终端日志缓冲区', 'info');
+        }
+
+        // 刷新监视画面
+        function refreshPreview() {
+            const img = document.getElementById('livePreviewImg');
+            const titleEl = document.getElementById('previewTaskTitle');
+            const badgeEl = document.getElementById('previewProgressBadge');
+            const zoomImg = document.getElementById('zoomModalImg');
+
+            if (!selectedTaskId) {
+                const src = '/api/screen.png?t=' + Date.now();
+                img.src = src;
+                if (zoomImg) zoomImg.src = src;
+                titleEl.innerText = '默认就绪视口';
+                badgeEl.innerText = '待命就绪';
+                return;
+            }
+
+            const current = currentTasks.find(t => t.id === selectedTaskId);
+            if (current) {
+                const displayName = current.name || current.id;
+                titleEl.innerText = `${displayName} [${current.accountName || '主账号'}]`;
+                const pct = current.progress ? (current.progress.percentage || 0) : 0;
+                badgeEl.innerText = `${current.progress?.unitTitle || '小节探测中'} (${pct}%)`;
+                const src = `/api/tasks/${selectedTaskId}/screenshot?t=` + Date.now();
+                img.src = src;
+                if (zoomImg && document.getElementById('previewZoomModal').style.display === 'flex') {
+                    zoomImg.src = src;
+                }
+            }
+        }
+
+        // 渲染结构化遥测日志
+        function renderLogs() {
+            const filterTask = document.getElementById('logFilterSelect').value;
+            const filterLevel = document.getElementById('logLevelSelect') ? document.getElementById('logLevelSelect').value : 'all';
+            const logBox = document.getElementById('logBoxView');
+
+            let filtered = allLogs;
+            if (filterTask === 'selected' && selectedTaskId) {
+                filtered = allLogs.filter(l => l.taskId === selectedTaskId);
+            }
+
+            if (filterLevel !== 'all') {
+                filtered = filtered.filter(l => {
+                    const msg = (l.msg || '') + (l.type || '');
+                    if (filterLevel === 'ai') return /AI|答题|测验|Gemini|GPT/i.test(msg);
+                    if (filterLevel === 'warn') return l.type === 'warn' || /9010|验证码|拦截|风控|警告/i.test(msg);
+                    if (filterLevel === 'error') return l.type === 'error' || /error|异常|失败|终止/i.test(msg);
+                    return true;
+                });
+            }
+
+            if (!filtered || filtered.length === 0) {
+                logBox.innerHTML = '<div class="log-entry" style="color: var(--xxt-text-secondary); padding: 8px 0;">当前筛选条件下无日志输出...</div>';
+                return;
+            }
+
+            let html = '';
+            for (const l of filtered.slice(-100)) {
+                const taskBadge = l.taskName ? `<span class="log-tag-badge log-tag-task">[${escapeHtml(l.taskName)}]</span>` : '';
+                
+                // 智能语义标签提取
+                let semanticTag = '';
+                const msgText = l.msg || '';
+                if (/AI|答题|测验|Gemini|GPT/i.test(msgText)) {
+                    semanticTag = '<span class="log-tag-badge log-tag-ai">[AI答题]</span>';
+                } else if (/9010|验证码|拦截|反爬/i.test(msgText)) {
+                    semanticTag = '<span class="log-tag-badge log-tag-warn">[风控探测]</span>';
+                } else if (l.type === 'error' || /异常|报错/i.test(msgText)) {
+                    semanticTag = '<span class="log-tag-badge log-tag-error">[异常中断]</span>';
+                } else if (/播放|跳转|进度/i.test(msgText)) {
+                    semanticTag = '<span class="log-tag-badge log-tag-info">[播放推进]</span>';
+                }
+
+                html += `
+                <div class="log-entry">
+                    <span class="log-time">${l.time}</span>
+                    ${taskBadge}
+                    ${semanticTag}
+                    <span class="log-text">${escapeHtml(msgText)}</span>
+                </div>`;
+            }
+            logBox.innerHTML = html;
+
+            if (isScrollLocked) {
+                logBox.scrollTop = logBox.scrollHeight;
+            }
+        }
+
+        // 账户管理交互
+        function openCreateAccountModal() {
+            document.getElementById('newAccountNameInput').value = '';
+            document.getElementById('createAccountModal').style.display = 'flex';
+        }
+        function closeCreateAccountModal() {
+            document.getElementById('createAccountModal').style.display = 'none';
+        }
+        async function submitCreateAccount() {
+            const name = document.getElementById('newAccountNameInput').value.trim();
+            if (!name) { showToast('请输入有效的账户备注名', 'warn'); return; }
+
+            try {
+                const res = await fetch('/api/accounts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    closeCreateAccountModal();
+                    fetchState();
+                    showToast(`账户「${data.account.name}」已添加，正在为您生成扫码二维码...`, 'success');
+                    openAccountQrModal(data.account.id);
+                } else {
+                    showToast('添加账户失败: ' + (data.error || '未知错误'), 'error');
+                }
+            } catch (e) {
+                showToast('网络请求异常: ' + e.message, 'error');
+            }
+        }
+
+        async function deleteAccountAction(id) {
+            const acc = currentAccounts.find(a => a.id === id);
+            const name = acc ? acc.name : id;
+            if (!confirm(`确定要彻底注销账户「${name}」及其独立隔离 Cookies 吗？`)) return;
+            try {
+                const res = await fetch(`/api/accounts/${id}`, { method: 'DELETE' });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`账户「${name}」已注销移除`, 'info');
+                    fetchState();
+                } else {
+                    showToast('删除账户失败: ' + data.error, 'error');
+                }
+            } catch (e) {
+                showToast('请求异常: ' + e.message, 'error');
+            }
+        }
+
+        // 账户专属扫码弹窗
+        async function openAccountQrModal(accountId) {
+            activeQrAccountId = accountId;
+            const acc = currentAccounts.find(a => a.id === accountId);
+            const accountName = acc ? (acc.userRealName || acc.name) : accountId;
+            document.getElementById('qrModalTitle').innerText = `正在为账户 [${accountName}] 扫码登录`;
+            document.getElementById('qrModalDesc').innerText = `请使用学习通 App 扫码授权，系统将自动绑定至该账户的独立上下文：`;
+            document.getElementById('qrStatusPrompt').innerHTML = '<span class="network-dot"></span><span>正在连接超星服务端生成专属二维码...</span>';
+            document.getElementById('accountQrModal').style.display = 'flex';
+
+            await refreshCurrentAccountQr();
+            startQrPolling(accountId);
+        }
+
+        function closeAccountQrModal() {
+            document.getElementById('accountQrModal').style.display = 'none';
+            if (qrPollTimer) {
+                clearInterval(qrPollTimer);
+                qrPollTimer = null;
+            }
+            activeQrAccountId = null;
+        }
+
+        async function refreshCurrentAccountQr() {
+            if (!activeQrAccountId) return;
+            try {
+                document.getElementById('qrStatusPrompt').innerHTML = '<span class="network-dot" style="background:#f59e0b;"></span><span>正在生成二维码数据流...</span>';
+                const res = await fetch(`/api/accounts/${activeQrAccountId}/qr-login`, { method: 'POST' });
+                const data = await res.json();
+                if (data.success && data.qrBase64) {
+                    document.getElementById('accountQrImg').src = data.qrBase64;
+                    document.getElementById('qrStatusPrompt').innerHTML = '<span class="network-dot"></span><span>二维码已就绪，请在 3 分钟内扫码...</span>';
+                } else {
+                    document.getElementById('qrStatusPrompt').innerHTML = '<span style="color:var(--xxt-signal-rose);">获取二维码失败: ' + (data.error || '未知错误') + '</span>';
+                }
+            } catch (e) {
+                document.getElementById('qrStatusPrompt').innerHTML = '<span style="color:var(--xxt-signal-rose);">请求异常: ' + e.message + '</span>';
+            }
+        }
+
+        function startQrPolling(accountId) {
+            if (qrPollTimer) clearInterval(qrPollTimer);
+            qrPollTimer = setInterval(async () => {
+                try {
+                    const res = await fetch(`/api/accounts/${accountId}/status`);
+                    if (!res.ok) return;
+                    const data = await res.json();
+                    if (data.success && data.account && data.account.status === 'LOGGED_IN') {
+                        clearInterval(qrPollTimer);
+                        qrPollTimer = null;
+                        document.getElementById('qrStatusPrompt').innerHTML = `<span style="color:var(--xxt-signal-emerald);font-weight:600;">🎉 扫码登录成功 (${escapeHtml(data.account.userRealName || data.account.name)})</span>`;
+                        showToast(`账户「${data.account.name}」已成功登录并持久化！`, 'success');
+                        setTimeout(() => {
+                            closeAccountQrModal();
+                            fetchState();
+                        }, 1200);
+                    }
+                } catch (e) {}
+            }, 2000);
+        }
+
+        // 任务操作交互
+        async function createSingleTask() {
+            const url = document.getElementById('singleUrl').value.trim();
+            const name = document.getElementById('singleName').value.trim();
+            const rate = document.getElementById('singleRate').value;
+            const accountId = document.getElementById('singleAccountSelect').value;
+
+            if (!url) { showToast('请输入有效的课程大纲或学习页 URL', 'warn'); return; }
+
+            try {
+                const res = await fetch('/api/tasks', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url, name, playbackRate: rate, accountId })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    document.getElementById('singleUrl').value = '';
+                    document.getElementById('singleName').value = '';
+                    showToast('课程任务已成功加入调度队列', 'success');
+                    fetchState();
+                } else {
+                    showToast('添加任务失败: ' + (data.error || '未知错误'), 'error');
+                }
+            } catch (e) {
+                showToast('请求异常: ' + e.message, 'error');
+            }
+        }
+
+        async function createBatchTasks() {
+            const text = document.getElementById('batchUrls').value.trim();
+            const rate = document.getElementById('batchRate').value;
+            const accountId = document.getElementById('batchAccountSelect').value;
+
+            if (!text) { showToast('请在文本框中粘贴至少一条有效课程链接', 'warn'); return; }
+            const urls = text.split('\n').map(s => s.trim()).filter(s => s.startsWith('http'));
+
+            if (urls.length === 0) {
+                showToast('未检测到以 http 开头的有效链接', 'warn');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/tasks/batch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ urls, playbackRate: rate, accountId })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    document.getElementById('batchUrls').value = '';
+                    showToast(`已批量导入 ${data.count} 门课程并绑定至所选账户！`, 'success');
+                    switchCreateTab('single');
+                    fetchState();
+                } else {
+                    showToast('批量导入失败: ' + (data.error || '未知错误'), 'error');
+                }
+            } catch (e) {
+                showToast('批量导入请求异常: ' + e.message, 'error');
+            }
+        }
+
+        async function startTask(id) {
+            await fetch(`/api/tasks/${id}/start`, { method: 'POST' });
+            showToast('已下发任务启动指令', 'info');
+            fetchState();
+        }
+
+        async function pauseTask(id) {
+            await fetch(`/api/tasks/${id}/pause`, { method: 'POST' });
+            showToast('已下发任务暂停指令', 'info');
+            fetchState();
+        }
+
+        async function deleteTask(id) {
+            if (!confirm('确定要删除此挂机任务吗？此操作不可撤销。')) return;
+            await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
+            showToast('挂机任务已删除', 'info');
+            fetchState();
+        }
+
+        async function setPriority(id, action) {
+            await fetch(`/api/tasks/${id}/priority`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action })
+            });
+            showToast('任务已调整至队列最前列 (置顶)', 'info');
+            fetchState();
+        }
+
+        async function changeConcurrency(val) {
+            await fetch('/api/settings/concurrency', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ maxConcurrent: val })
+            });
+            showToast(`全局并发数已调整为 ${val} 路`, 'info');
+            fetchState();
+        }
+
+        async function startAllTasks() {
+            await fetch('/api/tasks/start-all', { method: 'POST' });
+            showToast('正在启动全部排队与暂停任务...', 'success');
+            fetchState();
+        }
+
+        async function stopAllTasks() {
+            await fetch('/api/tasks/stop-all', { method: 'POST' });
+            showToast('正在暂停所有并发挂机线程...', 'warn');
+            fetchState();
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        // 启动轮询
+        fetchState();
+        setInterval(fetchState, 2500);
+    </script>
+</body>
+</html>
