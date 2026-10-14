@@ -1,11 +1,14 @@
-# 🚀 超星学习通全景高可用无头自动化学习与智能挂机引擎 (XXT Automation Service)
+# 🚀 xxt-next-workbench (学习通 Next)
+
+> **大模型驱动 · 自愈沙箱热修 · 多租户并发 · 全景 Web 学习托管工作台**  
+> *An autonomous, self-healing headless learning engine powered by LLMs & Playwright.*
 
 [![License: ISC](https://img.shields.io/badge/License-ISC-blue.svg)](https://opensource.org/licenses/ISC)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D18.0.0-green.svg)](https://nodejs.org/)
 [![Playwright](https://img.shields.io/badge/Playwright-1.40%2B-red.svg)](https://playwright.dev/)
 [![Status](https://img.shields.io/badge/Status-Production%20Ready-brightgreen.svg)](#)
 
-XXT Automation Service 是一套专为超星学习通打造的高可用、无头化（Headless）、多租户并发的自动化学习与任务托管平台。结合大语言模型智能答题、自愈沙箱热修补门禁与双轨运行架构，兼顾本地家庭宽带原生抗风控与云端 VPS 24/7 无人值守常驻能力。
+`xxt-next-workbench` 是一套专为超星学习通打造的高可用、无头化（Headless）、多租户并发的自动化学习与任务托管平台。结合大语言模型智能答题、自愈沙箱热修补门禁与双轨运行架构，兼顾本地家庭宽带原生抗风控与云端 VPS 24/7 无人值守常驻能力。
 
 ---
 
@@ -75,8 +78,8 @@ XXT Automation Service 是一套专为超星学习通打造的高可用、无头
 
 ```bash
 # 克隆仓库
-git clone <YOUR_REPOSITORY_URL>
-cd 学习通
+git clone https://github.com/AttaTani/xxt-next-workbench.git
+cd xxt-next-workbench
 
 # 安装项目依赖
 npm install
